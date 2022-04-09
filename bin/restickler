@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -x
 #
 # Quinn Comendant <quinn@strangecode.com>
 # 2021-12-21 21:35:38
@@ -147,7 +146,7 @@ function _self_update() {
     if [[ ! -s "$tmpdl" || -z $tmp_version ]]; then
         _error "Failed to download new version from ${restickler_url}";
     fi
-    if [[ "$tmp_version" == "$(echo -e "${restickler_version}\n${tmp_version}" | sort -V | tail -1)" ]]; then
+    if [[ "$restickler_version" == "$tmp_version" ]]; then
         _info "restickler ${restickler_version} is currently the newest version available.";
     else
         _info "Updating restickler from ${restickler_version} to ${tmp_version}…";
