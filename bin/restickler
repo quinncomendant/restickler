@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -x
 #
 # Quinn Comendant <quinn@strangecode.com>
 # 2021-12-21 21:35:38
@@ -10,7 +11,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.0';
+restickler_version='1.0.1';
 script_start_time=$(date +%s);
 log_file="$HOME/var/restickler/log";
 
@@ -140,10 +141,10 @@ function _self_update() {
     self=$(readlink -f "$0");
     tmpdl="/tmp/restickler-${script_start_time}-$(head -c 100 /dev/urandom | LC_ALL=C tr -dc '0-9A-Za-z')";
     cp -p "$self" "$tmpdl"; # Copy existing script just to retain permissions.
-    restickler_url="https://raw.githubusercontent.com/quinncomendant/restickler/master/bin/restickler";
+    restickler_url="https://raw.githubusercontent.com/quinncomendant/restickler/master/bin/restickler?t=${script_start_time}";
     curl -sLo "$tmpdl" "$restickler_url";
     tmp_version=$(sed -n '/^restickler_version=/s/[^0-9.]//gp' "$tmpdl");
-    if [[ -s "$tmpdl" || -z $tmp_version ]]; then
+    if [[ ! -s "$tmpdl" || -z $tmp_version ]]; then
         _error "Failed to download new version from ${restickler_url}";
     fi
     if [[ "$tmp_version" == "$(echo -e "${restickler_version}\n${tmp_version}" | sort -V | tail -1)" ]]; then
@@ -152,6 +153,7 @@ function _self_update() {
         _info "Updating restickler from ${restickler_version} to ${tmp_version}…";
         $dryrunexec mv "$tmpdl" "$self" || _error "Failed to replace $self with $tmpdl";
     fi
+    exit 0;
 }
 
 function _debug() {
