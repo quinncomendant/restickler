@@ -1,12 +1,12 @@
 # restickler
 
-A wrapper for [restic](https://restic.net/) that supervises back up, test restore, forget, prune, and check.
+A wrapper for [restic](https://restic.net/) to supervise back up, test restore, forget, prune, and check.
 
 ## Install
 
 ```bash
-mkdir ~/bin
-curl -L -o ~/bin/restickler https://path-to-restickler-script
+mkdir -p ~/bin
+curl -L -o ~/bin/restickler https://raw.githubusercontent.com/quinncomendant/restickler/master/bin/restickler
 chmod 755 ~/bin/restickler
 ```
 
@@ -21,8 +21,6 @@ Run `restickler -h` to print this usage message:
 
 ```
 Usage: restickler [OPTIONS] SOURCE [SOURCE…]
-
-restickler supervises restic to back up, test restore, forget, prune, and check.
 
 Back up SOURCE to the restic repository configured in `~/etc/restickler/env`.
 
@@ -43,6 +41,7 @@ OPTIONS
   -B          Abort if on battery power.
   -H          Abort if connected to an iOS hotspot.
   -I          Abort if internet is unreliable.
+  -V          Print version number.
 
 restickler runs the following commands to maintain the full lifecycle of a healthy repository:
 

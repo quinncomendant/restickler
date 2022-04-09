@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -x
 #
 # Quinn Comendant <quinn@strangecode.com>
 # 2021-12-21 21:35:38
@@ -11,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-script_name=$(basename "$0");
+restickler_version='1.0.0';
 script_start_time=$(date +%s);
 log_file="$HOME/var/restickler/log";
 
@@ -41,31 +40,39 @@ check_interval_hours=168; # 7 days
 #
 
 function _usage() {
-    echo -n "Usage: $script_name [OPTIONS] SOURCE [SOURCE…]
+    echo -n "restickler ${restickler_version}
 
-$script_name supervises restic to back up, test restore, forget, prune, and check.
+Supervise restic to back up, test restore, forget, prune, and check.
+https://github.com/quinncomendant/restickler
+Quinn Comendant <quinn@strangecode.com>
+
+USAGE
+
+  restickler [OPTIONS] SOURCE [SOURCE…]
 
 Back up SOURCE to the restic repository configured in \`~/etc/restickler/env\`.
 
 OPTIONS
 
-  -b HOURS    Min interval between back up operations (currently every ${backup_interval_hours} hours).
-  -c HOURS    Min interval between check operations (currently every ${check_interval_hours} hours).
-  -d MBPS|%   Limit download speed in Mb/s or as a percentage of available bandwidth, e.g., \`-d 50%\`.
-  -e FILE     File containing back up exclusion rules, used as --exclude-file=FILE.
-  -f HOURS    Min interval between forget operations (currently every ${forget_interval_hours} hours).
-  -h          Display this help message.
-  -n          Dry run: print the expected outcome to the screen; don’t actually do anything.
-  -p HOURS    Min interval between prune operations (currently every ${prune_interval_hours} hours).
-  -q          Do not output comprehensive progress report.
-  -u MBPS|%   Limit upload speed in Mb/s or as a percentage of available bandwidth, e.g., \`-u 50%\`.
-  -v          Display verbose output (-vv or -vvv to list uploaded files).
-  -A          Abort if there has been no user activity since last back up.
-  -B          Abort if on battery power.
-  -H          Abort if connected to an iOS hotspot.
-  -I          Abort if internet is unreliable.
+  -b HOURS       Min interval between back up operations (currently every ${backup_interval_hours} hours).
+  -c HOURS       Min interval between check operations (currently every ${check_interval_hours} hours).
+  -d MBPS|%      Limit download speed in Mb/s or as a percentage of available bandwidth, e.g., \`-d 50%\`.
+  -e FILE        File containing back up exclusion rules, used as --exclude-file=FILE.
+  -f HOURS       Min interval between forget operations (currently every ${forget_interval_hours} hours).
+  -h             Display this help message.
+  -n             Dry run: print the expected outcome to the screen; don’t actually do anything.
+  -p HOURS       Min interval between prune operations (currently every ${prune_interval_hours} hours).
+  -q             Do not output comprehensive progress report.
+  -u MBPS|%      Limit upload speed in Mb/s or as a percentage of available bandwidth, e.g., \`-u 50%\`.
+  -v             Display verbose output (-vv or -vvv to list uploaded files).
+  -A             Abort if there has been no user activity since last back up.
+  -B             Abort if on battery power.
+  -H             Abort if connected to an iOS hotspot.
+  -I             Abort if internet is unreliable.
+  -V             Print version information.
+  --self-update  Download the replace restickler with the latest release from GitHub.
 
-$script_name runs the following commands to maintain the full lifecycle of a healthy repository:
+restickler runs the following commands to maintain the full lifecycle of a healthy repository:
 
   1. \`restic backup\` (every ${backup_interval_hours} hours or as specified by -b)
   2. \`restic restore\` (test of a single “canary” file at \`~/etc/restickler/canary/{DATETIME}\`)
@@ -78,7 +85,7 @@ GETTING STARTED
   1. Configure credentials and repository in \`~/etc/restickler/env\` (see ENVIRONMENT VARIABLES below)
   2. Configure excluded paths in \`~/etc/restickler/exclude/restickler.txt\`
   3. Initialize the backup destination: \`restic -r gs://backup-bucket-name:/ init\`
-  4. Do back up with \`$script_name \$HOME\`
+  4. Do back up with \`restickler \$HOME\`
 
 About every year-or-so, when connected to fast internet, run \`restic check --read-data\` to verify all data.
 
@@ -99,41 +106,53 @@ EXAMPLES
 
 Back up the home directory:
 
-  $script_name \$HOME
+  restickler \$HOME
 
 Back up home, print files as they upload, limited to 50% of the available bandwidth:
 
-  $script_name -vv -d 50% -u 50% \$HOME
+  restickler -vv -d 50% -u 50% \$HOME
 
 Force forget, prune, and check to run by setting intervals to 0 (removing the
 ~/var/restickler/last-*-time files would also reset the interval timer):
 
-  $script_name -f 0 -p 0 -c 0 \$HOME
+  restickler -f 0 -p 0 -c 0 \$HOME
 
 A sane configuration for crontab (cron needs % to be escaped):
 
-  0 * * * * $script_name -vvABHI -d 75\% -u 75\% -b 1 -f 24 -p 168 -c 72 \$HOME >/dev/null
+  0 * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 -f 24 -p 168 -c 72 \$HOME >/dev/null
 
 Back up multiple paths, with a custom excludes file:
 
-  $script_name -e \$HOME/etc/restickler/exclude/library.txt \$HOME/Library/Application\ Support/{MailMate,TextMate}
+  restickler -e \$HOME/etc/restickler/exclude/library.txt \$HOME/Library/Application\ Support/{MailMate,TextMate}
 
-To pause $script_name (do this before editing this script in production):
+To pause restickler (do this before editing this script in production):
 
     mkdir /tmp/restickler/lock
 
-To unpause $script_name (or restart computer, which clears /tmp/ files):
+To unpause restickler (or restart computer, which clears /tmp/ files):
 
     rm -r /tmp/restickler/lock
 " 1>&2
     exit 1;
 }
 
-# function _self_update() {
-#     tmp="/tmp/${script_name}-${script_start_time}-$(head -c 100 /dev/urandom | LC_ALL=C tr -dc '0-9A-Za-z')";
-#     cp -p "$script_name" "$tmp"; # Copy existing script just to retain permissions.
-#     curl -sL
-# }
+function _self_update() {
+    self=$(readlink -f "$0");
+    tmpdl="/tmp/restickler-${script_start_time}-$(head -c 100 /dev/urandom | LC_ALL=C tr -dc '0-9A-Za-z')";
+    cp -p "$self" "$tmpdl"; # Copy existing script just to retain permissions.
+    restickler_url="https://raw.githubusercontent.com/quinncomendant/restickler/master/bin/restickler";
+    curl -sLo "$tmpdl" "$restickler_url";
+    tmp_version=$(sed -n '/^restickler_version=/s/[^0-9.]//gp' "$tmpdl");
+    if [[ -s "$tmpdl" || -z $tmp_version ]]; then
+        _error "Failed to download new version from ${restickler_url}";
+    fi
+    if [[ "$tmp_version" == "$(echo -e "${restickler_version}\n${tmp_version}" | sort -V | tail -1)" ]]; then
+        _info "restickler ${restickler_version} is currently the newest version available.";
+    else
+        _info "Updating restickler from ${restickler_version} to ${tmp_version}…";
+        $dryrunexec mv "$tmpdl" "$self" || _error "Failed to replace $self with $tmpdl";
+    fi
+}
 
 function _debug() {
     local IFS='' dt;
@@ -162,6 +181,7 @@ function _error() {
     dt=$(date '+%F %T');
     echo -e "[${dt}] [error] $*" | tee -a "${log_file}" 1>&2
     # Send “fail” signal to HealthChecks.io when run via cron.
+    # shellcheck disable=SC2015
     [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} ]] && curl -fsS -X POST --data-binary "[${dt}] $*" --retry 3 "${HEALTHCHECKS_URL}/fail" >/dev/null || true;
     # Send a user-defined USR1 signal, which is trapped to exit the main process.
     kill -USR1 $$;
@@ -173,12 +193,12 @@ function _elapsed() {
 
 # Return 0 on the first successful ping, or return 1 if no ping after 9 seconds.
 function _online {
+    # shellcheck disable=SC2034
     for i in {1..10}; do
         if (ping -t 1 -i .1 storage.googleapis.com) &>/dev/null; then
             return 0;
         fi
     done
-
     return 1;
 }
 
@@ -302,6 +322,7 @@ function _restic_backup() {
     fi
 
     # Send “start” signal to HealthChecks.io when run via cron.
+    # shellcheck disable=SC2015
     [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} ]] && curl -fsS -X POST --data-binary "Starting back up of $*" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
 
     _info "Starting back up";
@@ -318,6 +339,7 @@ function _restic_backup() {
     [[ -z $dryrun ]] && echo -n "$script_start_time" >| "$last_backup_time_file";
 
     # Send “success” signal to HealthChecks.io when run via cron.
+    # shellcheck disable=SC2015
     [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} ]] && curl -fsS -X POST --data-binary "Finished back up ($(_elapsed) elapsed)" --retry 3 "${HEALTHCHECKS_URL}" >/dev/null || true;
 }
 
@@ -471,7 +493,7 @@ function _restic_check() {
 [[ $# == 0 ]] && _usage;
 
 # Process command line options.
-while getopts "b:c:d:e:f:hnp:qu:vABHI-:" opt ; do
+while getopts "b:c:d:e:f:hnp:qu:vABHIV-:" opt ; do
     case $opt in
         (b) backup_interval_hours=${OPTARG%.*};; # Args with hours need to be integers.
         (c) check_interval_hours=${OPTARG%.*};;
@@ -488,7 +510,9 @@ while getopts "b:c:d:e:f:hnp:qu:vABHI-:" opt ; do
         (B) do_check_battery=1;;
         (H) do_check_hotspot=1;;
         (I) do_check_internet=1;;
+        (V) echo -n "restickler ${restickler_version} ($([[ -x $(command -v restic) ]] && restic version))"; exit 0;;
         (-) case $OPTARG in
+            (self-update) _self_update;;
             (help) _usage;;
             (?) _error "Invalid option: '$OPTARG'. Run with no arguments for help.";;
         esac ;;
@@ -521,7 +545,7 @@ fi
 mkdir -p "$HOME/etc/restickler/canary" "$HOME/var/restickler" "/tmp/restickler/restore/$HOME/etc/restickler/canary";
 
 # Enforce single-instance execution (via mkdir, which creates atomic lock and check at once).
-mkdir /tmp/restickler/lock 2>/dev/null || ( _info "Another $script_name process is awaiting completion. Please wait and try again later. Run with no arguments for help."; exit 1; );
+mkdir /tmp/restickler/lock 2>/dev/null || ( _info "Another restickler process is awaiting completion. Please wait and try again later. Run with no arguments for help."; exit 1; );
 
 # networkQuality results are regenerated each time restickler runs.
 rm -f "$HOME/var/restickler/network_quality.json";
