@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.1';
+restickler_version='1.0.2';
 script_start_time=$(date +%s);
 log_file="$HOME/var/restickler/log";
 
@@ -75,10 +75,10 @@ OPTIONS
 restickler runs the following commands to maintain the full lifecycle of a healthy repository:
 
   1. \`restic backup\` (every ${backup_interval_hours} hours or as specified by -b)
-  2. \`restic restore\` (test of a single “canary” file at \`~/etc/restickler/canary/{DATETIME}\`)
-  3. \`restic forget\` (every ${check_interval_hours} hours or as specified by -f)
-  4. \`restic prune\` (every ${forget_interval_hours} hours or as specified by -p)
-  5. \`restic check\` (every ${prune_interval_hours} hours or as specified by -c)
+  2. \`restic restore\` (test of a single “canary” file at \`~/etc/restickler/canary/[timestamp]\`)
+  3. \`restic forget\` (every ${forget_interval_hours} hours or as specified by -f)
+  4. \`restic prune\` (every ${prune_interval_hours} hours or as specified by -p)
+  5. \`restic check\` (every ${check_interval_hours} hours or as specified by -c)
 
 GETTING STARTED
 
@@ -102,6 +102,10 @@ The following environment variables must be defined in \`~/etc/restickler/env\`:
 The GOOGLE_* variables can be replaced by the cloud-provider of your choice;
 see https://restic.readthedocs.io/en/latest/030_preparing_a_new_repo.html
 
+LOGS
+
+Activity is logged to \`~/var/restickler/log\`. If run with \`-v\`, a list of uploaded files is included.
+
 EXAMPLES
 
 Back up the home directory:
@@ -112,24 +116,24 @@ Back up home, print files as they upload, limited to 50% of the available bandwi
 
   restickler -vv -d 50% -u 50% \$HOME
 
-Force forget, prune, and check to run by setting intervals to 0 (removing the
-~/var/restickler/last-*-time files would also reset the interval timer):
+  Force back up, forget, prune, and check to run by setting intervals to 0 (removing the
+  \`~/var/restickler/last-*-time\` files would also reset the interval timer):
 
-  restickler -f 0 -p 0 -c 0 \$HOME
+  restickler -b 0 -f 0 -p 0 -c 0 \$HOME
 
 A sane configuration for crontab (cron needs % to be escaped):
 
-  0 * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 -f 24 -p 168 -c 72 \$HOME >/dev/null
+  * * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 \$HOME >/dev/null
 
 Back up multiple paths, with a custom excludes file:
 
   restickler -e \$HOME/etc/restickler/exclude/library.txt \$HOME/Library/Application\ Support/{MailMate,TextMate}
 
-To pause restickler (do this before editing this script in production):
+Pause restickler:
 
     mkdir /tmp/restickler/lock
 
-To unpause restickler (or restart computer, which clears /tmp/ files):
+Unpause restickler (or restart computer, which clears /tmp/ files):
 
     rm -r /tmp/restickler/lock
 " 1>&2
@@ -152,6 +156,7 @@ function _self_update() {
         _info "Updating restickler from ${restickler_version} to ${tmp_version}…";
         $dryrunexec mv "$tmpdl" "$self" || _error "Failed to replace $self with $tmpdl";
     fi
+    rm "$tmpdl";
     exit 0;
 }
 
@@ -192,14 +197,13 @@ function _elapsed() {
     printf '%dd%dh%dm%ds' $((SECONDS/86400)) $((SECONDS%86400/3600)) $((SECONDS%3600/60)) $((SECONDS%60)) | sed -E 's/(^0d(0h(0m)?)?)?//';
 }
 
-# Return 0 on the first successful ping, or return 1 if no ping after 9 seconds.
 function _online {
-    # shellcheck disable=SC2034
-    for i in {1..10}; do
-        if (ping -t 1 -i .1 storage.googleapis.com) &>/dev/null; then
-            return 0;
-        fi
+    for i in {1..5}; do
+        # Return 0 if http response code is in 100-599 range and total response time is less than 1s.
+        curl -s -o /dev/null -w '%{http_code} %{time_total}' https://storage.googleapis.com/ 2>/dev/null | awk '{exit !($1 ~ /^[12345][0-9][0-9]$/ && $2 < 1)}' && return 0;
+        sleep 1;
     done
+    # Return 1 if all 5 attempts to connect fail.
     return 1;
 }
 
@@ -290,7 +294,7 @@ function _repository_is_locked() {
 
 function _restic_backup() {
     local last_backup_time_file;
-    last_backup_time_file="$HOME/var/restickler/last-backup-time-$(md5 <<<"$*")";
+    last_backup_time_file="$HOME/var/restickler/last-backup-time-$(LC_ALL=C tr -c '[0-9A-Za-z\n]' - <<<"$*")";
 
     if [[ -s "$last_backup_time_file" && $(<"$last_backup_time_file") -gt $((script_start_time - (60 * 60 * backup_interval_hours))) ]]; then
         _info "Skipping back up (last ran $(bc <<<"scale=1; ($script_start_time - $(<"$last_backup_time_file")) / 60 / 60") hours ago)";
@@ -336,7 +340,7 @@ function _restic_backup() {
         $dryrun \
         2>&1 | { grep -v '^unchanged' || true; } | tee -a "${log_file}" | { grep -Ev '^(modified|new)' || true; } || _error "Failed to back up ($(_elapsed) elapsed)"
 
-    # Save the timestamp of when this script began running to the `last-backup-time-md5…` file.
+    # Save the timestamp of when this script began running to the `last-backup-time…` file.
     [[ -z $dryrun ]] && echo -n "$script_start_time" >| "$last_backup_time_file";
 
     # Send “success” signal to HealthChecks.io when run via cron.
@@ -515,9 +519,9 @@ while getopts "b:c:d:e:f:hnp:qu:vABHIV-:" opt ; do
         (-) case $OPTARG in
             (self-update) _self_update;;
             (help) _usage;;
-            (?) _error "Invalid option: '$OPTARG'. Run with no arguments for help.";;
+            (?) _error "Invalid option: \`$OPTARG\`. Use option -h for help.";;
         esac ;;
-        (?) _error "Invalid option: '$opt'. Run with no arguments for help.";;
+        (?) _error "Invalid option: \`$opt\`. Use option -h for help.";;
         (*) _error "An unexpected error occurred.";;
     esac
 done
@@ -535,6 +539,10 @@ done
 [[ -x $(command -v curl) ]] || _error "The curl command is not available";
 [[ -x $(command -v jq) ]] || _error "The jq command is not available";
 [[ -x $(command -v bc) ]] || _error "The bc command is not available";
+[[ -x $(command -v tr) ]] || _error "The tr command is not available";
+[[ -x $(command -v awk) ]] || _error "The awk command is not available";
+[[ -x $(command -v readlink) ]] || _error "The readlink command is not available";
+[[ -x $(command -v curl) ]] || _error "The curl command is not available";
 
 restic_min_version='0.13.0';
 restic_installed_version=$(restic version | awk '{print $2}');
@@ -546,7 +554,7 @@ fi
 mkdir -p "$HOME/etc/restickler/canary" "$HOME/var/restickler" "/tmp/restickler/restore/$HOME/etc/restickler/canary";
 
 # Enforce single-instance execution (via mkdir, which creates atomic lock and check at once).
-mkdir /tmp/restickler/lock 2>/dev/null || ( _info "Another restickler process is awaiting completion. Please wait and try again later. Run with no arguments for help."; exit 1; );
+mkdir /tmp/restickler/lock 2>/dev/null || ( _info "Another restickler process is awaiting completion."; exit 1; );
 
 # networkQuality results are regenerated each time restickler runs.
 rm -f "$HOME/var/restickler/network_quality.json";
