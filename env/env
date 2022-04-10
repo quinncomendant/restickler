@@ -1,0 +1,19 @@
+# See all understood env vars at https://restic.readthedocs.io/en/stable/040_backup.html#environment-variables
+
+# Repository password saved in the macOS KeyChain.
+# To use restic from the terminal and cron, you have to add the password to both login and System keychains:
+# 1. Add the password to the login keychain: `security add-generic-password -s restic-repository-pw -a restic -w`
+# 2. Copy it from the login keychain to the System keychain (right-click copy in login → right-click paste in System).
+export RESTIC_PASSWORD_COMMAND='security find-generic-password -a restic -s restic-repository-pw -w';
+
+# GCP Service Account credentials.
+# https://console.cloud.google.com/iam-admin/serviceaccounts
+export GOOGLE_PROJECT_ID='[your project id]';
+export GOOGLE_APPLICATION_CREDENTIALS="$HOME/etc/restickler/[your service account key file].json";
+
+# The repository to backup to and restore from.
+# https://console.cloud.google.com/storage/browser
+export RESTIC_REPOSITORY='gs:[your bucket name]:/';
+
+# The URL to ping for backup success or failure at Healthchecks.io.
+export HEALTHCHECKS_URL='https://hc-ping.com/[base healthcheck url]';

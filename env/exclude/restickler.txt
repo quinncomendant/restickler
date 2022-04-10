@@ -1,0 +1,64 @@
+# Pretty safe to always exclude these.
+# In any case, we have a copy on an external SSD, riiiight?
+$HOME/.bash_history
+$HOME/.bash_sessions
+$HOME/.cache
+$HOME/.composer
+$HOME/.config/yarn
+$HOME/.cpan
+$HOME/.docker
+$HOME/.gem
+$HOME/.node-gyp
+$HOME/.npm
+$HOME/.tor
+$HOME/.Trash
+$HOME/Applications
+$HOME/Downloads/**/*.avi
+$HOME/Downloads/**/*.djvu
+$HOME/Downloads/**/*.dmg
+$HOME/Downloads/**/*.epub
+$HOME/Downloads/**/*.gz
+$HOME/Downloads/**/*.iso
+$HOME/Downloads/**/*.m4a
+$HOME/Downloads/**/*.m4v
+$HOME/Downloads/**/*.mkv
+$HOME/Downloads/**/*.mov
+$HOME/Downloads/**/*.mp3
+$HOME/Downloads/**/*.mp4
+$HOME/Downloads/**/*.pdf
+$HOME/Downloads/**/*.rar
+$HOME/Downloads/**/*.tar
+$HOME/Downloads/**/*.tgz
+$HOME/Downloads/**/*.zip
+$HOME/go
+$HOME/mbox
+$HOME/Movies/Final Cut *
+$HOME/Movies/Motion Templates.localized
+$HOME/Movies/TV
+$HOME/Music/GarageBand
+$HOME/Music/Music
+# Photos.sqlite file changes frequently and at 1.1 GB it's better to back up weekly rather than hourly.
+$HOME/Pictures/Photos Library.photoslibrary
+$HOME/Public
+$HOME/tmp
+$HOME/var
+*.err
+*.lock
+*.log
+*Cache-wal*
+*_log
+.cache
+.DS_Store
+.npm
+.Trash
+Cache
+cache
+Caches
+caches
+com.apple.loginwindow.*.plist
+GPUCache
+node_modules*
+*~
+*-202[0-9][0-1][0-9][0-3][0-9]
+*-202[0-9]-[0-1][0-9]-[0-3][0-9]
+*-nobackup
