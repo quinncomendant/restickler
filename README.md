@@ -147,6 +147,7 @@ Unpause restickler (or restart computer, which clears /tmp/ files):
 ## To do
 
 - The retention policy applied with `restic forget` is currently hard coded; it should be configurable.
+- Configurable logging level. Currently the log can grow by tens of megabytes per month.
 
 ## License
 

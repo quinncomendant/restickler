@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.4';
+restickler_version='1.0.5';
 script_start_time=$(date +%s);
 log_file="$HOME/var/restickler/log";
 
@@ -598,7 +598,7 @@ restic snapshots >/dev/null || _error "Failed to connect to repository ${RESTIC_
 # Generate a “canary” file to test restore later. A 10KB file * 24 * 365 * 10 ≈ 855 MB per decade.
 # Only when the home directory is in the set of sources, because we need $HOME/etc/restickler/canary in the backup.
 canary_file="$HOME/etc/restickler/canary/$(TZ=UTC date '+%FT%H%M%SZ')";
-if [[ ! $(printf ':%s:' "$@") =~ ":$HOME:" ]]; then
+if [[ $(printf ':%s:' "$@") =~ ":$HOME:" ]]; then
     find "$HOME/etc/restickler/canary" "/tmp/restickler/restore/$HOME/etc/restickler/canary" -type f -delete;
     head -c 10240 /dev/urandom > "$canary_file"
 fi
