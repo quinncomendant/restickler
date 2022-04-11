@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.3';
+restickler_version='1.0.4';
 script_start_time=$(date +%s);
 log_file="$HOME/var/restickler/log";
 
@@ -75,7 +75,7 @@ OPTIONS
 restickler runs the following commands to maintain the full lifecycle of a healthy repository:
 
   1. \`restic backup\` (every ${backup_interval_hours} hours or as specified by -b)
-  2. \`restic restore\` (test of a single “canary” file at \`~/etc/restickler/canary/TIMESTAMP\`)
+  2. \`restic restore\` (test of a single “canary” file at \`~/etc/restickler/canary/UTC_DATE_TIME\`)
   3. \`restic forget\` (every ${forget_interval_hours} hours or as specified by -f)
   4. \`restic prune\` (every ${prune_interval_hours} hours or as specified by -p)
   5. \`restic check\` (every ${check_interval_hours} hours or as specified by -c)
@@ -156,7 +156,7 @@ function _self_update() {
         _info "Updating restickler from ${restickler_version} to ${tmp_version}…";
         $dryrunexec mv "$tmpdl" "$self" || _error "Failed to replace $self with $tmpdl";
     fi
-    rm "$tmpdl";
+    rm -f "$tmpdl";
     exit 0;
 }
 
@@ -595,12 +595,12 @@ fi
 # Make sure the remote repository exists.
 restic snapshots >/dev/null || _error "Failed to connect to repository ${RESTIC_REPOSITORY}";
 
-# Generate a “canary” file to test restore later. A 12KB file * 24 * 365 * 10 ≈ 1 GB per decade.
-# Only when backing up the entire home directory, because we need $HOME/etc/restickler/canary in the included set of backup files.
-canary_file="$HOME/etc/restickler/canary/$(date '+%Y%m%d%H%M%S')";
-if [[ $HOME == "$*" ]]; then
+# Generate a “canary” file to test restore later. A 10KB file * 24 * 365 * 10 ≈ 855 MB per decade.
+# Only when the home directory is in the set of sources, because we need $HOME/etc/restickler/canary in the backup.
+canary_file="$HOME/etc/restickler/canary/$(TZ=UTC date '+%FT%H%M%SZ')";
+if [[ ! $(printf ':%s:' "$@") =~ ":$HOME:" ]]; then
     find "$HOME/etc/restickler/canary" "/tmp/restickler/restore/$HOME/etc/restickler/canary" -type f -delete;
-    head -c 11970 /dev/urandom > "$canary_file"
+    head -c 10240 /dev/urandom > "$canary_file"
 fi
 
 #
