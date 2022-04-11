@@ -141,7 +141,6 @@ Pause restickler:
 Unpause restickler (or restart computer, which clears /tmp/ files):
 
     rm -r /tmp/restickler/lock
-
 ```
 
 ## To do
