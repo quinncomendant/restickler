@@ -87,7 +87,7 @@ GETTING STARTED
 
   1. Configure credentials and repository in `~/etc/restickler/env` (see ENVIRONMENT VARIABLES below)
   2. Configure excluded paths in `~/etc/restickler/exclude/restickler.txt`
-  3. Initialize the backup destination: `restic -r gs:YOUR_BUCKET_NAME:/ init`
+  3. Initialize the backup destination: `source ~/etc/restickler/env && restic -r gs:YOUR_BUCKET_NAME:/ init`
   4. Do back up with `restickler $HOME`
 
 About every year-or-so, when connected to fast internet, run `restic check --read-data` to verify all data.
