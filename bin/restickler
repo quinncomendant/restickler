@@ -75,7 +75,7 @@ OPTIONS
 restickler runs the following commands to maintain the full lifecycle of a healthy repository:
 
   1. \`restic backup\` (every ${backup_interval_hours} hours or as specified by -b)
-  2. \`restic restore\` (test of a single “canary” file at \`~/etc/restickler/canary/[timestamp]\`)
+  2. \`restic restore\` (test of a single “canary” file at \`~/etc/restickler/canary/TIMESTAMP\`)
   3. \`restic forget\` (every ${forget_interval_hours} hours or as specified by -f)
   4. \`restic prune\` (every ${prune_interval_hours} hours or as specified by -p)
   5. \`restic check\` (every ${check_interval_hours} hours or as specified by -c)
@@ -84,7 +84,7 @@ GETTING STARTED
 
   1. Configure credentials and repository in \`~/etc/restickler/env\` (see ENVIRONMENT VARIABLES below)
   2. Configure excluded paths in \`~/etc/restickler/exclude/restickler.txt\`
-  3. Initialize the backup destination: \`restic -r gs://backup-bucket-name:/ init\`
+  3. Initialize the backup destination: \`source ~/etc/restickler/env && restic -r gs:YOUR_BUCKET_NAME:/ init\`
   4. Do back up with \`restickler \$HOME\`
 
 About every year-or-so, when connected to fast internet, run \`restic check --read-data\` to verify all data.
@@ -349,8 +349,8 @@ function _restic_backup() {
 }
 
 function _restic_test_restore() {
-    if [[ $HOME != "$*" ]]; then
-        _info "Skipping test restore because $HOME != $*";
+    if [[ ! $(printf ':%s:' "$@") =~ ":$HOME:" ]]; then
+        _info "Skipping test restore because $HOME does not match any source argument";
         return 1;
     fi
 

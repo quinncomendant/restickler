@@ -8,12 +8,12 @@ export RESTIC_PASSWORD_COMMAND='security find-generic-password -a restic -s rest
 
 # GCP Service Account credentials.
 # https://console.cloud.google.com/iam-admin/serviceaccounts
-export GOOGLE_PROJECT_ID='[your project id]';
-export GOOGLE_APPLICATION_CREDENTIALS="$HOME/etc/restickler/[your service account key file].json";
+export GOOGLE_PROJECT_ID='YOUR_PROJECT_ID';
+export GOOGLE_APPLICATION_CREDENTIALS="$HOME/etc/restickler/YOUR_SERVICE_ACCOUNT_KEY_FILE.json";
 
 # The repository to backup to and restore from.
 # https://console.cloud.google.com/storage/browser
-export RESTIC_REPOSITORY='gs:[your bucket name]:/';
+export RESTIC_REPOSITORY='gs:YOUR_BUCKET_NAME:/';
 
 # The URL to ping for backup success or failure at Healthchecks.io.
-export HEALTHCHECKS_URL='https://hc-ping.com/[base healthcheck url]';
+export HEALTHCHECKS_URL='https://hc-ping.com/YOUR_HEALTHCHECK_URL';

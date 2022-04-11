@@ -25,14 +25,14 @@ curl -L -o ~/etc/restickler/exclude/restickler.txt https://raw.githubusercontent
 ## Set up
 
 1. [Prepare your back up repository](https://restic.readthedocs.io/en/latest/030_preparing_a_new_repo.html) (GCP’s [Coldline Storage](https://cloud.google.com/storage/docs/storage-classes#coldline) is a great choice)
-2. Initialize the backup destination, e.g., if using GCP Storage: `restic -r gs://[your bucket name]:/ init`
-3. Configure credentials and repository in `~/etc/restickler/env`
-4. Configure excluded paths in `~/etc/restickler/exclude/restickler.txt`
+2. Configure credentials and repository in `~/etc/restickler/env`
+3. Configure [exclude paths](https://restic.readthedocs.io/en/latest/040_backup.html#excluding-files) in `~/etc/restickler/exclude/restickler.txt`
+4. Initialize the backup destination, e.g., if using GCP Storage: `source ~/etc/restickler/env && restic -r gs:YOUR_BUCKET_NAME:/ init`
 5. Test your configuration with a dry-run: `restickler -n $HOME`
 6. Back up your home directory: `restickler $HOME`
 7. Automatically back up hourly by adding this to `crontab -e`:
 ```cron
-PATH=/Users/[your username]/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+PATH=/Users/YOUR_USERNAME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 * * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 $HOME >/dev/null
 ```
 (For restic to have permission to access your files you may need to give `cron` [Full Disk Access](https://send.strangecode.com/f/screen-shot-2022-04-10-at-13-25-23.png) in *System Preferences → Security & Privacy → Privacy → Full Disk Access → (click + and select `/usr/sbin/cron`)*)
@@ -78,7 +78,7 @@ OPTIONS
 restickler runs the following commands to maintain the full lifecycle of a healthy repository:
 
   1. `restic backup` (every 0 hours or as specified by -b)
-  2. `restic restore` (test of a single “canary” file at `~/etc/restickler/canary/[timestamp]`)
+  2. `restic restore` (test of a single “canary” file at `~/etc/restickler/canary/TIMESTAMP`)
   3. `restic forget` (every 24 hours or as specified by -f)
   4. `restic prune` (every 240 hours or as specified by -p)
   5. `restic check` (every 168 hours or as specified by -c)
@@ -87,7 +87,7 @@ GETTING STARTED
 
   1. Configure credentials and repository in `~/etc/restickler/env` (see ENVIRONMENT VARIABLES below)
   2. Configure excluded paths in `~/etc/restickler/exclude/restickler.txt`
-  3. Initialize the backup destination: `restic -r gs://backup-bucket-name:/ init`
+  3. Initialize the backup destination: `restic -r gs:YOUR_BUCKET_NAME:/ init`
   4. Do back up with `restickler $HOME`
 
 About every year-or-so, when connected to fast internet, run `restic check --read-data` to verify all data.
