@@ -2,6 +2,8 @@
 
 A wrapper for [restic](https://restic.net/) that supervises back up, test restore, forget, prune, and check. Designed for macOS, but works on Linux too.
 
+Restickler is considered “beta quality” software, and not yet ready for production use.
+
 ## Features
 
 - Run back up and maintenance functions (forget, prune, and check) on a minimal interval schedule. E.g., schedule back up to every 3 hours with `restickler -b 3`, and prune every 3 days with `restickler -p 72`.
@@ -145,3 +147,11 @@ Unpause restickler (or restart computer, which clears /tmp/ files):
 ## To do
 
 - The retention policy applied with `restic forget` is currently hard coded; it should be configurable.
+
+## License
+
+MIT License; see LICENSE for details.
+
+## Disclaimer
+
+This software is provided by the copyright holders and contributors “as is” without support or implied warranties as to its quality, merchantability, or fitness for a particular purpose.
