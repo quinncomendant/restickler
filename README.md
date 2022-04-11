@@ -1,6 +1,6 @@
 # restickler
 
-A wrapper for [restic](https://restic.net/) that supervises back up, test restore, forget, prune, and check. Designed for macOS but it should also work on Linux.
+A wrapper for [restic](https://restic.net/) that supervises back up, test restore, forget, prune, and check. Designed for macOS, but works on Linux too.
 
 ## Features
 
@@ -66,6 +66,7 @@ OPTIONS
   -n             Dry run: print the expected outcome to the screen; don’t actually do anything.
   -p HOURS       Min interval between prune operations (currently every 240 hours).
   -q             Do not output comprehensive progress report.
+  --self-update  Download the replace restickler with the latest release from GitHub.
   -u MBPS|%      Limit upload speed in Mb/s or as a percentage of available bandwidth, e.g., `-u 50%`.
   -v             Display verbose output (-vv or -vvv to list uploaded files).
   -A             Abort if there has been no user activity since last back up.
@@ -73,7 +74,6 @@ OPTIONS
   -H             Abort if connected to an iOS hotspot.
   -I             Abort if internet is unreliable.
   -V             Print version information.
-  --self-update  Download the replace restickler with the latest release from GitHub.
 
 restickler runs the following commands to maintain the full lifecycle of a healthy repository:
 
@@ -107,7 +107,7 @@ see https://restic.readthedocs.io/en/latest/030_preparing_a_new_repo.html
 
 LOGS
 
-Activity is logged to `~/var/restickler/log`. If run with `-v`, a list of uploaded files is included.
+Activity is logged to `~/var/restickler/log`. If run with `-vv` or `-vvv`, a list of uploaded files is included.
 
 EXAMPLES
 
@@ -115,12 +115,12 @@ Back up the home directory:
 
   restickler $HOME
 
-Back up home, print files as they upload, limited to 50% of the available bandwidth:
+Back up /root and /home, medium verbosity, limited to 50% of the available bandwidth:
 
-  restickler -vv -d 50% -u 50% $HOME
+  restickler -vv -d 50% -u 50% /root /home
 
-  Force back up, forget, prune, and check to run by setting intervals to 0 (removing the
-  `~/var/restickler/last-*-time` files would also reset the interval timer):
+Force back up, forget, prune, and check to run by setting intervals to 0 (removing
+the `~/var/restickler/last-*-time*` files would also reset the interval timer):
 
   restickler -b 0 -f 0 -p 0 -c 0 $HOME
 
@@ -141,3 +141,7 @@ Unpause restickler (or restart computer, which clears /tmp/ files):
     rm -r /tmp/restickler/lock
 
 ```
+
+## To do
+
+- The retention policy applied with `restic forget` is currently hard coded; it should be configurable.
