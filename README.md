@@ -12,17 +12,14 @@ A wrapper for [restic](https://restic.net/) that supervises back up, test restor
 
 ## Install
 
-1. Install prerequisites with [Homebrew](https://brew.sh/ "The Missing Package Manager for macOS"):
-```bash
-brew install restic jq
-```
+1. Install prerequisites: [restic](https://restic.readthedocs.io/en/latest/020_installation.html) and [jq](https://stedolan.github.io/jq/download/). On macOS you can use [Homebrew](https://brew.sh/): `brew install restic jq`
 2. Install the `restickler` script in `~/bin/` and its config files in `~/etc/restickler/`:
 ```bash
-mkdir -p ~/{bin,etc/restickler}
+mkdir -p ~/{bin,etc/restickler/exclude}
 curl -L -o ~/bin/restickler https://raw.githubusercontent.com/quinncomendant/restickler/master/bin/restickler
+chmod 744 ~/bin/restickler
 curl -L -o ~/etc/restickler/env https://raw.githubusercontent.com/quinncomendant/restickler/master/etc/restickler/env
 curl -L -o ~/etc/restickler/exclude/restickler.txt https://raw.githubusercontent.com/quinncomendant/restickler/master/etc/restickler/exclude/restickler.txt
-chmod 755 ~/bin/restickler
 ```
 
 ## Set up
@@ -42,11 +39,10 @@ PATH=/Users/[your username]/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/
 
 ## Update
 
-Get the latest version of `restic` and `restickler` by running their self-update commands:
-```bash
-restic self-update
-restickler --self-update
-```
+Get the latest version of `restickler` and `restic` by running their self-update commands:
+
+- `restickler --self-update`
+- `restic self-update` or if installed via Homebrew: `"$(readlink -f "$(which restic)")" self-update`
 
 ## Usage
 
