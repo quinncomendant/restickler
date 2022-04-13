@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.5';
+restickler_version='1.0.6';
 script_start_time=$(date +%s);
 log_file="$HOME/var/restickler/log";
 
@@ -21,7 +21,7 @@ c_off="\033[0m";
 # Default configuration options.
 dl_limit='';
 ul_limit='';
-exclude_file="$HOME/etc/restickler/exclude/restickler.txt";
+exclude_file="$HOME/etc/restickler/exclude/default.txt";
 dryrun='';
 dryrunexec='';
 quiet='';
@@ -83,7 +83,7 @@ restickler runs the following commands to maintain the full lifecycle of a healt
 GETTING STARTED
 
     1. Configure credentials and repository in \`~/etc/restickler/env\` (see ENVIRONMENT VARIABLES below)
-    2. Configure excluded paths in \`~/etc/restickler/exclude/restickler.txt\`
+    2. Configure excluded paths in \`~/etc/restickler/exclude/default.txt\`
     3. Initialize the backup destination: \`source ~/etc/restickler/env && restic -r gs:YOUR_BUCKET_NAME:/ init\`
     4. Do back up with \`restickler \$HOME\`
 
@@ -91,12 +91,14 @@ About every year-or-so, when connected to fast internet, run \`restic check --re
 
 ENVIRONMENT VARIABLES
 
-The following environment variables must be defined in \`~/etc/restickler/env\`:
+The following environment variables can be defined in \`~/etc/restickler/env\`,
+which is automatically included by restickler if it exists:
 
-    RESTIC_PASSWORD_COMMAND         The shell command to obtain the repository password from.
-    GOOGLE_PROJECT_ID               GCP project ID.
-    GOOGLE_APPLICATION_CREDENTIALS  GCP Service Account credentials.
     RESTIC_REPOSITORY               The repository to back up to and restore from.
+    RESTIC_PASSWORD_COMMAND         The shell command to obtain the repository password from. (You can also
+                                    use RESTIC_PASSWORD but it is less secure to store creds in config files.)
+    GOOGLE_APPLICATION_CREDENTIALS  GCP Service Account credentials.
+    GOOGLE_PROJECT_ID               GCP project ID.
     HEALTHCHECKS_URL                The URL to ping for back up success or failure at Healthchecks.io (optional).
 
 The GOOGLE_* variables can be replaced by the cloud-provider of your choice;
@@ -108,13 +110,13 @@ Activity is logged to \`~/var/restickler/log\`. If run with \`-vv\` or \`-vvv\`,
 
 EXAMPLES
 
-Back up the entire home directory, except for files matching exclusions configured in \`~/etc/restickler/exclude/restickler.txt\`:
+Back up the entire home directory, except files matched by \`~/etc/restickler/exclude/default.txt\`:
 
     restickler \$HOME
 
-Back up multiple paths, with a custom excludes file:
+Back up all Apple Photo libraries, with a custom exclude file:
 
-    restickler -e \$HOME/etc/restickler/exclude/library.txt \$HOME/Library/Application\ Support/{MailMate,TextMate}
+    restickler -e \$HOME/etc/restickler/exclude/photoslibrary.txt \$HOME/Pictures/*.photoslibrary
 
 Force back up, forget, prune, and check to run by setting intervals to 0 (removing
 the \`~/var/restickler/last-*-time*\` files would also reset the interval timer):
@@ -131,7 +133,7 @@ Pause restickler:
 
     mkdir /tmp/restickler/lock
 
-Unpause restickler (or restart computer, which clears /tmp/ files):
+Unpause restickler (restarting computer will also clear /tmp/ files):
 
     rm -r /tmp/restickler/lock
 " 1>&2
@@ -201,8 +203,8 @@ function _online {
         curl -s -o /dev/null -w '%{http_code} %{time_total}' https://storage.googleapis.com/ 2>/dev/null | awk '{exit !($1 ~ /^[12345][0-9][0-9]$/ && $2 < 1)}' && return 0;
         sleep 1;
     done
-    # Return 1 if all 5 attempts to connect fail.
-    return 1;
+    # All 5 attempts to connect failed.
+    return "$i";
 }
 
 function _network_quality() {
@@ -292,7 +294,7 @@ function _repository_is_locked() {
 
 function _restic_backup() {
     local last_backup_time_file;
-    last_backup_time_file="$HOME/var/restickler/last-backup-time-$(LC_ALL=C tr -c '[0-9A-Za-z\n]' - <<<"$*")";
+    last_backup_time_file="$HOME/var/restickler/last-backup-time-$(LC_ALL=C tr -c '0-9A-Za-z\n' - <<<"$*")";
 
     if [[ -s "$last_backup_time_file" && $(<"$last_backup_time_file") -gt $((script_start_time - (60 * 60 * backup_interval_hours))) ]]; then
         _info "Skipping back up (last ran $(bc <<<"scale=1; ($script_start_time - $(<"$last_backup_time_file")) / 60 / 60") hours ago)";
@@ -347,6 +349,7 @@ function _restic_backup() {
 }
 
 function _restic_test_restore() {
+    # shellcheck disable=SC2076
     if [[ ! $(printf ':%s:' "$@") =~ ":$HOME:" ]]; then
         _info "Skipping test restore because $HOME does not match any source argument";
         return 1;
@@ -578,11 +581,10 @@ trap '_trap EXIT $LINENO' EXIT;
 caffeinate='';
 [[ -x $(command -v caffeinate) ]] && caffeinate='caffeinate -i';
 
-# Load environment variables used to lessen the arguments needed to run restic.
-[[ -f "$HOME/etc/restickler/env" ]] || _error "Missing $HOME/etc/restickler/env file";
-source "$HOME/etc/restickler/env";
-if [[ -z $GOOGLE_PROJECT_ID || -z $GOOGLE_APPLICATION_CREDENTIALS || -z $RESTIC_PASSWORD_COMMAND || -z $RESTIC_REPOSITORY ]]; then
-    _error "Missing restic environment variable(s)";
+# Load environment variables used by restic and restickler.
+[[ -f "$HOME/etc/restickler/env" ]] && source "$HOME/etc/restickler/env";
+if [[ -z $RESTIC_REPOSITORY || ( -z $RESTIC_PASSWORD_COMMAND && -z $RESTIC_PASSWORD ) ]]; then
+    _error "Missing restic environment variable(s): RESTIC_REPOSITORY and/or RESTIC_PASSWORD_COMMAND; see https://restic.readthedocs.io/en/latest/040_backup.html#environment-variables";
 fi
 
 if ! _online; then
@@ -596,6 +598,7 @@ restic snapshots >/dev/null || _error "Failed to connect to repository ${RESTIC_
 # Generate a “canary” file to test restore later. A 10KB file * 24 * 365 * 10 ≈ 855 MB per decade.
 # Only when the home directory is in the set of sources, because we need $HOME/etc/restickler/canary in the backup.
 canary_file="$HOME/etc/restickler/canary/$(TZ=UTC date '+%FT%H%M%SZ')";
+# shellcheck disable=SC2076
 if [[ $(printf ':%s:' "$@") =~ ":$HOME:" ]]; then
     find "$HOME/etc/restickler/canary" "/tmp/restickler/restore/$HOME/etc/restickler/canary" -type f -delete;
     head -c 10240 /dev/urandom > "$canary_file"
