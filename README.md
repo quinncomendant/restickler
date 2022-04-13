@@ -53,56 +53,58 @@ Run `restickler -h` to print this usage message:
 ```
 USAGE
 
-  restickler [OPTIONS] SOURCE [SOURCE…]
+    restickler [OPTIONS] SOURCE [SOURCE…]
 
 Back up SOURCE to the restic repository configured in `~/etc/restickler/env`.
 
 OPTIONS
 
-  -b HOURS       Min interval between back up operations (currently every 0 hours).
-  -c HOURS       Min interval between check operations (currently every 168 hours).
-  -d MBPS|%      Limit download speed in Mb/s or as a percentage of available bandwidth, e.g., `-d 50%`.
-  -e FILE        File containing back up exclusion rules, used as --exclude-file=FILE.
-  -f HOURS       Min interval between forget operations (currently every 24 hours).
-  -h             Display this help message.
-  -n             Dry run: print the expected outcome to the screen; don’t actually do anything.
-  -p HOURS       Min interval between prune operations (currently every 240 hours).
-  -q             Do not output comprehensive progress report.
-  --self-update  Download the replace restickler with the latest release from GitHub.
-  -u MBPS|%      Limit upload speed in Mb/s or as a percentage of available bandwidth, e.g., `-u 50%`.
-  -v             Display verbose output (-vv or -vvv to list uploaded files).
-  -A             Abort if there has been no user activity since last back up.
-  -B             Abort if on battery power.
-  -H             Abort if connected to an iOS hotspot.
-  -I             Abort if internet is unreliable.
-  -V             Print version information.
+    -b HOURS       Min interval between back up operations (currently every 0 hours).
+    -c HOURS       Min interval between check operations (currently every 168 hours).
+    -d MBPS|%      Limit download speed in Mb/s or as a percentage of available bandwidth, e.g., `-d 50%`.
+    -e FILE        File containing back up exclusion rules, used as --exclude-file=FILE.
+    -f HOURS       Min interval between forget operations (currently every 24 hours).
+    -h             Display this help message.
+    -n             Dry run: print the expected outcome to the screen; don’t actually do anything.
+    -p HOURS       Min interval between prune operations (currently every 240 hours).
+    -q             Do not output comprehensive progress report.
+    --self-update  Download the replace restickler with the latest release from GitHub.
+    -u MBPS|%      Limit upload speed in Mb/s or as a percentage of available bandwidth, e.g., `-u 50%`.
+    -v             Display verbose output (-vv or -vvv to list uploaded files).
+    -A             Abort if there has been no user activity since last back up.
+    -B             Abort if on battery power.
+    -H             Abort if connected to an iOS hotspot.
+    -I             Abort if internet is unreliable.
+    -V             Print version information.
 
 restickler runs the following commands to maintain the full lifecycle of a healthy repository:
 
-  1. `restic backup` (every 0 hours or as specified by -b)
-  2. `restic restore` (test of a single “canary” file at `~/etc/restickler/canary/TIMESTAMP`)
-  3. `restic forget` (every 24 hours or as specified by -f)
-  4. `restic prune` (every 240 hours or as specified by -p)
-  5. `restic check` (every 168 hours or as specified by -c)
+    1. `restic backup` (every 0 hours or as specified by -b)
+    2. `restic restore` (test of a single “canary” file at `~/etc/restickler/canary/UTC_DATE_TIME`)
+    3. `restic forget` (every 24 hours or as specified by -f)
+    4. `restic prune` (every 240 hours or as specified by -p)
+    5. `restic check` (every 168 hours or as specified by -c)
 
 GETTING STARTED
 
-  1. Configure credentials and repository in `~/etc/restickler/env` (see ENVIRONMENT VARIABLES below)
-  2. Configure excluded paths in `~/etc/restickler/exclude/restickler.txt`
-  3. Initialize the backup destination: `source ~/etc/restickler/env && restic -r gs:YOUR_BUCKET_NAME:/ init`
-  4. Do back up with `restickler $HOME`
+    1. Configure credentials and repository in `~/etc/restickler/env` (see ENVIRONMENT VARIABLES below)
+    2. Configure excluded paths in `~/etc/restickler/exclude/default.txt`
+    3. Initialize the backup destination: `source ~/etc/restickler/env && restic -r gs:YOUR_BUCKET_NAME:/ init`
+    4. Do back up with `restickler $HOME`
 
 About every year-or-so, when connected to fast internet, run `restic check --read-data` to verify all data.
 
 ENVIRONMENT VARIABLES
 
-The following environment variables must be defined in `~/etc/restickler/env`:
+The following environment variables can be defined in `~/etc/restickler/env`,
+which is automatically included by restickler if it exists:
 
-  RESTIC_PASSWORD_COMMAND         The shell command to obtain the repository password from.
-  GOOGLE_PROJECT_ID               GCP project ID.
-  GOOGLE_APPLICATION_CREDENTIALS  GCP Service Account credentials.
-  RESTIC_REPOSITORY               The repository to back up to and restore from.
-  HEALTHCHECKS_URL                The URL to ping for back up success or failure at Healthchecks.io (optional).
+    RESTIC_REPOSITORY               The repository to back up to and restore from.
+    RESTIC_PASSWORD_COMMAND         The shell command to obtain the repository password from. (You can also
+                                    use RESTIC_PASSWORD but it is less secure to store creds in config files.)
+    GOOGLE_APPLICATION_CREDENTIALS  GCP Service Account credentials.
+    GOOGLE_PROJECT_ID               GCP project ID.
+    HEALTHCHECKS_URL                The URL to ping for back up success or failure at Healthchecks.io (optional).
 
 The GOOGLE_* variables can be replaced by the cloud-provider of your choice;
 see https://restic.readthedocs.io/en/latest/030_preparing_a_new_repo.html
@@ -113,32 +115,30 @@ Activity is logged to `~/var/restickler/log`. If run with `-vv` or `-vvv`, a lis
 
 EXAMPLES
 
-Back up the home directory:
+Back up the entire home directory, except files matched by `~/etc/restickler/exclude/default.txt`:
 
-  restickler $HOME
+    restickler $HOME
 
-Back up /root and /home, medium verbosity, limited to 50% of the available bandwidth:
+Back up all Apple Photo libraries, with a custom exclude file:
 
-  restickler -vv -d 50% -u 50% /root /home
+    restickler -e $HOME/etc/restickler/exclude/photoslibrary.txt $HOME/Pictures/*.photoslibrary
 
 Force back up, forget, prune, and check to run by setting intervals to 0 (removing
 the `~/var/restickler/last-*-time*` files would also reset the interval timer):
 
-  restickler -b 0 -f 0 -p 0 -c 0 $HOME
+    restickler -b 0 -f 0 -p 0 -c 0 $HOME
 
-A sane configuration for crontab (cron needs % to be escaped):
+A sane configuration for crontab: medium verbosity to log files as they upload,
+skip back up when idle, on battery, using hotspot, or unreliable internet, with
+upload and download limited to 75% of available bandwidth (cron needs % to be escaped):
 
-  * * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 $HOME >/dev/null
-
-Back up multiple paths, with a custom excludes file:
-
-  restickler -e $HOME/etc/restickler/exclude/library.txt $HOME/Library/Application\ Support/{MailMate,TextMate}
+    */7 * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 $HOME >/dev/null
 
 Pause restickler:
 
     mkdir /tmp/restickler/lock
 
-Unpause restickler (or restart computer, which clears /tmp/ files):
+Unpause restickler (restarting computer will also clear /tmp/ files):
 
     rm -r /tmp/restickler/lock
 ```
