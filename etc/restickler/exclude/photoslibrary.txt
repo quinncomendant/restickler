@@ -1,1 +1,18 @@
-$HOME/Pictures/Photos Library.photoslibrary/resources/derivatives
+# Apple Photos does non-destructive edits to your images and original copies are kept in the originals folder.
+# https://www.tonkata.com/posts/apple-photos/
+#
+# The following files can be excluded because they can be regenerated with these steps:
+# 1. Open Photos and select `Library` in the sidebar.
+# 2. Select all (⌘a).
+# 3. Rotate all photos counterclockwise (⌘r)
+# 4. Rotate all phtoos clockwise (⌘⌥r)
+
+# Edited copies of photos are available in the resources/renders folder
+# along with a plist file for each photo (sharing the same UUID) describing the edits.
+$HOME/Pictures/*.photoslibrary/resources/renders/**/*.jpeg
+$HOME/Pictures/*.photoslibrary/resources/renders/**/*.heic
+$HOME/Pictures/*.photoslibrary/resources/renders/**/*.mov
+
+# Resized photo versions are available in the resources/derivatives folder.
+# These smaller versions include the latest edits applied to the photo.
+$HOME/Pictures/*.photoslibrary/resources/derivatives

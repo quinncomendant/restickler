@@ -1,0 +1,107 @@
+# Conservative defaults for back up of $HOME on macOS Monterey.
+# Please modify this file for your needs. See docs at:
+# https://restic.readthedocs.io/en/latest/040_backup.html#excluding-files
+
+# Most of ~/Library should *not* be backed up (lots of caches, cloud-synced data), so exclude subdirectories…
+$HOME/Library/**/*
+$HOME/Library/Containers/com.docker.docker
+$HOME/Library/Containers/Docker
+$HOME/Library/Application Support/MobileSync/Backup
+$HOME/Library/Application Support/**/File System
+
+# Then selectively include the directories you want to back up by prefixing them with `!`:
+!$HOME/Library/Application Support
+!$HOME/Library/Keychains
+!$HOME/Library/Mail
+!$HOME/Library/Preferences
+!$HOME/Library/Scripts
+!$HOME/Library/Services
+# etc…
+
+# The Apple Photos database file (Photos.sqlite) changes frequently, resulting in about 1 GB of new data every back up.
+# Do it separately, perhaps weekly, using  `-e $HOME/etc/restickler/exclude/photoslibrary.txt`.
+$HOME/Pictures/*.photoslibrary
+
+$HOME/**/fish/fish_history*
+$HOME/.bash_history*
+$HOME/.bash_sessions
+$HOME/.cache
+$HOME/.composer
+$HOME/.config/yarn
+$HOME/.cpan
+$HOME/.docker
+$HOME/.gem
+$HOME/.histfile*
+$HOME/.node-gyp
+$HOME/.npm
+$HOME/.tor
+$HOME/.Trash
+$HOME/.zhistory*
+$HOME/.zsh_history*
+$HOME/Applications
+$HOME/Downloads/**/*.avi
+$HOME/Downloads/**/*.djvu
+$HOME/Downloads/**/*.dmg
+$HOME/Downloads/**/*.epub
+$HOME/Downloads/**/*.gz
+$HOME/Downloads/**/*.iso
+$HOME/Downloads/**/*.m4a
+$HOME/Downloads/**/*.m4v
+$HOME/Downloads/**/*.mkv
+$HOME/Downloads/**/*.mov
+$HOME/Downloads/**/*.mp3
+$HOME/Downloads/**/*.mp4
+$HOME/Downloads/**/*.pdf
+$HOME/Downloads/**/*.rar
+$HOME/Downloads/**/*.tar
+$HOME/Downloads/**/*.tgz
+$HOME/Downloads/**/*.zip
+$HOME/go
+$HOME/mbox
+$HOME/Movies/Final Cut *
+$HOME/Movies/Motion Templates.localized
+$HOME/Movies/TV
+$HOME/Music/GarageBand
+$HOME/Music/Music
+$HOME/Public
+$HOME/tmp
+$HOME/var
+**/php_sess/sess_*
+**/wp-content/updraft
+*-202[0-9]-[0-1][0-9]-[0-3][0-9]
+*-202[0-9][0-1][0-9][0-3][0-9]
+*-20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]
+*-20[0-9][0-9]-[0-1][0-9]-[0-3][0-9].gz
+*-20[0-9][0-9]-[0-1][0-9]-[0-3][0-9].tar.gz
+*-20[0-9][0-9]-[0-1][0-9]-[0-3][0-9].tgz
+*-20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z
+*-20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z.gz
+*-20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z.tar.gz
+*-20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z.tgz
+*-20[0-9][0-9][0-1][0-9][0-3][0-9]
+*-20[0-9][0-9][0-1][0-9][0-3][0-9].gz
+*-20[0-9][0-9][0-1][0-9][0-3][0-9].tar.gz
+*-20[0-9][0-9][0-1][0-9][0-3][0-9].tgz
+*.err
+*.lock
+*.noindex
+*Cache-wal*
+*[._]log
+*[._]log.[0-9]
+*[._]log-[0-9]
+*~
+.DS_Store
+.npm
+.Trash
+.[Cc]ache
+CacheStorage
+com.apple.loginwindow.*.plist
+et-cache
+GPUCache
+mt-preview-*
+node_modules*
+ScriptCache
+tmp
+update-cache
+[Cc]ache
+[Cc]aches
