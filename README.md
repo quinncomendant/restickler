@@ -60,7 +60,7 @@ Get the latest version of `restickler` and `restic` by running their self-update
 
 Run `restickler -h` to print this usage message:
 
-```bash
+```
 USAGE
 
     restickler [OPTIONS] SOURCE [SOURCE…]
