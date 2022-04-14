@@ -6,7 +6,7 @@
 # 2. Copy it from the login keychain to the System keychain (right-click copy in login → right-click paste in System).
 export RESTIC_PASSWORD_COMMAND='security find-generic-password -a restic -s restic-repository-pw -w';
 
-# On Linux you save your password to `~/.config/restickler/restic-repository-pw` (`chmod 600 …`) and
+# On Linux you save your password to `~/.config/restickler/restic-repository-pw` (`chmod 640 …`) and
 # set RESTIC_PASSWORD_COMMAND to 'cat ~/.config/restickler/restic-repository-pw'.
 # You may also use the RESTIC_PASSWORD variable, but this is less secure, because exported variables
 # containing credentials may be revealed accidentally.
@@ -14,7 +14,7 @@ export RESTIC_PASSWORD_COMMAND='security find-generic-password -a restic -s rest
 # GCP Service Account credentials.
 # https://console.cloud.google.com/iam-admin/serviceaccounts
 export GOOGLE_PROJECT_ID='YOUR_PROJECT_ID';
-export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/restickler/YOUR_SERVICE_ACCOUNT_KEY_FILE.json"; # ← Set minimum permissions on this file (`chmod 600 …`).
+export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/restickler/YOUR_SERVICE_ACCOUNT_KEY_FILE.json"; # ← Set minimum permissions on this file (`chmod 640 …`).
 
 # The repository to backup to and restore from.
 # https://console.cloud.google.com/storage/browser

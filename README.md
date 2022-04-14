@@ -69,15 +69,15 @@ OPTIONS
     -e FILE           File containing back up exclusion rules, used as --exclude-file=FILE.
     -f HOURS          Min interval between forget operations (currently every 24 hours).
     -h                Display this help message.
-    --install-config  Install example config files (if they don't already exist):
-                      ~/.config/restickler/env
-                      ~/.config/restickler/exclude/default.txt
+    --install-config  Install example config files (will not overwrite existing files):
+                        ~/.config/restickler/env
+                        ~/.config/restickler/exclude/default.txt
     -n                Dry run: print the expected outcome to the screen; don’t actually do anything.
     -p HOURS          Min interval between prune operations (currently every 240 hours).
     -q                Do not output comprehensive progress report.
     --self-update     Download the replace restickler with the latest release from GitHub.
     -u MBPS|%         Limit upload speed in Mb/s or as a percentage of available bandwidth.
-    -v                Display verbose output (-vv or -vvv to list uploaded files).
+    -v                Display verbose output (-vv to list uploaded files; -vvv to show debugging output).
     -A                Abort if there has been no user activity since last back up.
     -B                Abort if on battery power.
     -H                Abort if connected to an iOS hotspot.

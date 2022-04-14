@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.7';
+restickler_version='1.0.8';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -71,15 +71,15 @@ OPTIONS
     -e FILE           File containing back up exclusion rules, used as --exclude-file=FILE.
     -f HOURS          Min interval between forget operations (currently every ${forget_interval_hours} hours).
     -h                Display this help message.
-    --install-config  Install example config files (if they don't already exist):
-                      $config_dir/env
-                      $config_dir/exclude/default.txt
+    --install-config  Install example config files (will not overwrite existing files):
+                        $config_dir/env
+                        $config_dir/exclude/default.txt
     -n                Dry run: print the expected outcome to the screen; don’t actually do anything.
     -p HOURS          Min interval between prune operations (currently every ${prune_interval_hours} hours).
     -q                Do not output comprehensive progress report.
     --self-update     Download the replace restickler with the latest release from GitHub.
     -u MBPS|%         Limit upload speed in Mb/s or as a percentage of available bandwidth.
-    -v                Display verbose output (-vv or -vvv to list uploaded files).
+    -v                Display verbose output (-vv to list uploaded files; -vvv to show debugging output).
     -A                Abort if there has been no user activity since last back up.
     -B                Abort if on battery power.
     -H                Abort if connected to an iOS hotspot.
@@ -143,7 +143,7 @@ skip back up when idle, on battery, using hotspot, or unreliable internet, with
 upload and download limited to 75% of available bandwidth (cron needs % to be escaped):
 
     */7 * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 \$HOME >/dev/null
-" 1>&2
+" | sed "s!${HOME}!~!g" 1>&2
     exit 1;
 }
 
@@ -191,7 +191,7 @@ function _self_update() {
 function _debug() {
     local IFS='' dt;
     dt=$(date '+%F %T');
-    [[ $verbose =~ '-v -v -v' ]] && echo -e "[${dt}] [debug] $*" | tee -a "${log_file}"
+    [[ $verbose =~ '-v -v -v' ]] && echo -e "[${dt}] [debug] $*" >> "${log_file}";
 }
 
 function _info() {
@@ -281,9 +281,9 @@ function convert_limit() {
     fi
 }
 
-function _unreliable_internet() {
+function _reliable_internet() {
     # Return true if the network has an RPM < 50, DL < 0.5Mbps, or UL < 0.5Mbps.
-    (( $(_network_quality .ul_responsiveness) < 50 || $(_network_quality .dl_throughput) < 524288 || $(_network_quality .ul_throughput) < 524288 ));
+    (( $(_network_quality .ul_responsiveness) > 50 && $(_network_quality .dl_throughput) > 524288 && $(_network_quality .ul_throughput) > 524288 ));
 }
 
 function _computer_has_been_idle() {
@@ -357,7 +357,7 @@ function _restic_backup() {
         exit 0;
     fi
 
-    if [[ -n $do_check_internet ]] && _unreliable_internet; then
+    if [[ -n $do_check_internet ]] && ! _reliable_internet; then
         _info "Aborting back up because of unreliable internet";
         exit 1;
     fi
@@ -416,7 +416,7 @@ function _restic_forget() {
         exit 0;
     fi
 
-    if [[ -n $do_check_internet ]] && _unreliable_internet; then
+    if [[ -n $do_check_internet ]] && ! _reliable_internet; then
         _info "Aborting forget because of unreliable internet";
         exit 1;
     fi
@@ -463,7 +463,7 @@ function _restic_prune() {
         exit 0;
     fi
 
-    if [[ -n $do_check_internet ]] && _unreliable_internet; then
+    if [[ -n $do_check_internet ]] && ! _reliable_internet; then
         _info "Aborting prune because of unreliable internet";
         exit 1;
     fi
@@ -504,7 +504,7 @@ function _restic_check() {
         exit 0;
     fi
 
-    if [[ -n $do_check_internet ]] && _unreliable_internet; then
+    if [[ -n $do_check_internet ]] && ! _reliable_internet; then
         _info "Aborting check because of unreliable internet";
         exit 1;
     fi
