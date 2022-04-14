@@ -16,17 +16,21 @@ Restickler is considered “beta quality” software, and is in active developme
 
 1. Install prerequisites: [restic](https://restic.readthedocs.io/en/latest/020_installation.html) and [jq](https://stedolan.github.io/jq/download/). Use [Homebrew](https://brew.sh/) to install on macOS: `brew install restic jq`
 2. Install the `restickler` script in `~/bin/`:
-```bash
-mkdir -p ~/bin
-curl -L -o ~/bin/restickler https://raw.githubusercontent.com/quinncomendant/restickler/master/bin/restickler
-chmod 755 ~/bin/restickler
-```
-(Put `~/bin` in your shell’s $PATH.)
+
+    ```bash
+    mkdir -p ~/bin
+    curl -L -o ~/bin/restickler https://raw.githubusercontent.com/quinncomendant/restickler/master/bin/restickler
+    chmod 755 ~/bin/restickler
+    ```
+    
+    (Put `~/bin` in your shell’s $PATH.)
 3. Install example config files:
-```bash
-restickler --install-config
-```
-(Files will be added to `~/.config/` or $XDG_CONFIG_HOME if defined.)
+
+    ```bash
+    restickler --install-config
+    ```
+
+    (Files will be added to `~/.config/` or $XDG_CONFIG_HOME if defined.)
 
 ## Set up
 
@@ -37,10 +41,12 @@ restickler --install-config
 5. Test your configuration with a dry-run: `restickler -vn $HOME`
 6. Back up your home directory: `restickler -v $HOME`
 7. Automatically back up hourly by adding this to `crontab -e`:
-```cron
-PATH=/Users/YOUR_USERNAME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
-* * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 $HOME >/dev/null
-```
+
+    ```cron
+    PATH=/Users/YOUR_USERNAME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+    * * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 $HOME >/dev/null
+    ```
+    
 (For restic to have permission to access your files you may need to give `cron` [Full Disk Access](https://send.strangecode.com/f/screen-shot-2022-04-10-at-13-25-23.png) in *System Preferences → Security & Privacy → Privacy → Full Disk Access → (click + and select `/usr/sbin/cron`)*)
 
 ## Update
@@ -54,7 +60,7 @@ Get the latest version of `restickler` and `restic` by running their self-update
 
 Run `restickler -h` to print this usage message:
 
-```
+```bash
 USAGE
 
     restickler [OPTIONS] SOURCE [SOURCE…]
