@@ -13,17 +13,9 @@ $HOME/Library/Application Support/**/File System
 !$HOME/Library/Application Support
 !$HOME/Library/Keychains/*.keychain-db
 !$HOME/Library/Mail
-!$HOME/Library/Preferences
 !$HOME/Library/Scripts
 !$HOME/Library/Services
 # etc…
-
-# The following files are not readable, because of SIP?
-# find ~/Library/Preferences -type f -exec file {} \; 2>&1 | grep 'Operation not permitted'
-$HOME/Library/Preferences/com.apple.mail-shared.plist
-$HOME/Library/Preferences/com.apple.AddressBook.plist
-$HOME/Library/Preferences/com.apple.homed.notbackedup.plist
-$HOME/Library/Preferences/com.apple.homed.plist
 
 # The Apple Photos database file (Photos.sqlite) changes frequently, resulting in about 1 GB of new data every back up.
 # Do it separately, perhaps weekly, using  `-e $HOME/etc/restickler/exclude/photoslibrary.txt`.

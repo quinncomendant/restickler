@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.9';
+restickler_version='1.0.10';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -40,6 +40,8 @@ do_check_idle='';
 do_check_battery='';
 do_check_hotspot='';
 do_check_internet='';
+do_self_update='';
+do_install_config='';
 backup_interval_hours=0; # By default, back up every time.
 forget_interval_hours=24; # 1 day
 prune_interval_hours=240; # 10 days
@@ -153,7 +155,7 @@ function _install_config() {
         _info "$config_dir/env file already exists; skipping";
     else
         http_code=$(curl -sL -w '%{http_code}' -o "$config_dir/env" "https://raw.githubusercontent.com/quinncomendant/restickler/master/config/env?t=${script_start_time}");
-        [[ $http_code == 200 ]] || _error "Failed to install $config_dir/env (HTTP code $http_code)";
+        [[ $http_code == 200 && -s "$config_dir/env" ]] || _error "Failed to install $config_dir/env (HTTP code $http_code)";
         chmod 600 "$config_dir/env";
         _info "Installed: \`$config_dir/env\` from https://github.com/quinncomendant/restickler/blob/master/config/env";
     fi
@@ -161,7 +163,7 @@ function _install_config() {
         _info "$config_dir/exclude/default.txt file already exists; skipping";
     else
         http_code=$(curl -sL -w '%{http_code}' -o "$config_dir/exclude/default.txt" "https://raw.githubusercontent.com/quinncomendant/restickler/master/config/exclude/default.txt?t=${script_start_time}");
-        [[ $http_code == 200 ]] || _error "Failed to install $config_dir/exclude/default.txt (HTTP code $http_code)";
+        [[ $http_code == 200 && -s "$config_dir/exclude/default.txt" ]] || _error "Failed to install $config_dir/exclude/default.txt (HTTP code $http_code)";
         _info "Installed: \`$config_dir/exclude/default.txt\` from https://github.com/quinncomendant/restickler/blob/master/config/exclude/default.txt";
     fi
     exit 0;
@@ -169,21 +171,18 @@ function _install_config() {
 
 function _self_update() {
     self=$(readlink -f "$0");
-    tmpdl="$tmp_dir/restickler-${script_start_time}-$(head -c 100 /dev/urandom | LC_ALL=C tr -dc '0-9A-Za-z')";
-    cp -p "$self" "$tmpdl"; # Copy existing script just to retain permissions.
+    tmp_dl="$tmp_dir/restickler-${script_start_time}-$(head -c 100 /dev/urandom | LC_ALL=C tr -dc '0-9A-Za-z')";
+    cp -p "$self" "$tmp_dl"; # Copy existing script just to retain permissions.
     restickler_url="https://raw.githubusercontent.com/quinncomendant/restickler/master/bin/restickler?t=${script_start_time}";
-    http_code=$(curl -sL -w '%{http_code}' -o "$tmpdl" "$restickler_url");
-    [[ $http_code == 200 ]] || _error "Failed to install $config_dir/exclude/default.txt (HTTP code $http_code)";
-    tmp_version=$(sed -n '/^restickler_version=/s/[^0-9.]//gp' "$tmpdl");
-    if [[ ! -s "$tmpdl" || -z $tmp_version ]]; then
-        _error "Failed to download new version from ${restickler_url}";
-    fi
+    http_code=$(curl -sL -w '%{http_code}' -o "$tmp_dl" "$restickler_url");
+    [[ $http_code == 200 && -s "$tmp_dl" ]] || _error "Failed to download $restickler_url (HTTP code $http_code)";
+    tmp_version=$(sed -n '/^restickler_version=/s/[^0-9.]//gp' "$tmp_dl" || true);
     if [[ "$restickler_version" == "$tmp_version" ]]; then
         _info "restickler ${restickler_version} is currently the newest version available.";
     elif _prompt "Update restickler from ${restickler_version} to ${tmp_version}?"; then
-        $dryrunexec mv "$tmpdl" "$self" || _error "Failed to replace $self with $tmpdl";
+        $dryrunexec mv "$tmp_dl" "$self" || _error "Failed to replace $self with $tmp_dl";
     fi
-    rm -f "$tmpdl" || true;
+    rm -f "$tmp_dl" || true;
     exit 0;
 }
 
@@ -555,8 +554,8 @@ while getopts "b:c:d:e:f:hnp:qu:vABHIV-:" opt ; do
         (I) do_check_internet=1;;
         (V) echo -n "restickler ${restickler_version} ($([[ -x $(command -v restic) ]] && restic version))"; exit 0;;
         (-) case $OPTARG in
-            (self-update) _self_update;;
-            (install-config) _install_config;;
+            (self-update) do_self_update=1;;
+            (install-config) do_install_config=1;;
             (help) _usage;;
             (?) _error "Invalid option: \`$OPTARG\`. Use option -h for help.";;
         esac ;;
@@ -643,6 +642,9 @@ fi
 #
 # Go!
 #
+
+[[ -n $do_install_config ]] && _install_config;
+[[ -n $do_self_update ]] && _self_update;
 
 _info "Starting restickler $* to ${RESTIC_REPOSITORY}";
 

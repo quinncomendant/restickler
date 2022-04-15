@@ -18,8 +18,9 @@ export GOOGLE_PROJECT_ID='YOUR_PROJECT_ID';
 export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/restickler/YOUR_SERVICE_ACCOUNT_KEY_FILE.json";
 
 # The repository to backup to and restore from.
+# If using Google Cloud Storage, the value looks like `gs:YOUR_BUCKET_NAME:/`.
 # https://console.cloud.google.com/storage/browser
-export RESTIC_REPOSITORY='gs:YOUR_BUCKET_NAME:/';
+export RESTIC_REPOSITORY='';
 
 # The URL to ping for backup success or failure at Healthchecks.io.
-export HEALTHCHECKS_URL='https://hc-ping.com/YOUR_HEALTHCHECK_URL';
+export HEALTHCHECKS_URL='';
