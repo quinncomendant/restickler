@@ -23,14 +23,14 @@ Restickler is considered “beta quality” software, and is in active developme
     chmod 755 ~/bin/restickler
     ```
     
-    (Put `~/bin` in your shell’s $PATH.)
+    (Be sure to add `~/bin` in your shell’s $PATH.)
 3. Install example config files:
 
     ```bash
     restickler --install-config
     ```
 
-    (Files will be added to `~/.config/` or $XDG_CONFIG_HOME if defined.)
+    (Files will be added to `~/.config/`, or $XDG_CONFIG_HOME if defined.)
 
 ## Set up
 

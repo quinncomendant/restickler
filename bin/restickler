@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.8';
+restickler_version='1.0.9';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -180,11 +180,8 @@ function _self_update() {
     fi
     if [[ "$restickler_version" == "$tmp_version" ]]; then
         _info "restickler ${restickler_version} is currently the newest version available.";
-    else
-        # shellcheck disable=SC2015
-        if _prompt "Update restickler from ${restickler_version} to ${tmp_version}?"; then
-            $dryrunexec mv "$tmpdl" "$self" || _error "Failed to replace $self with $tmpdl";
-        fi
+    elif _prompt "Update restickler from ${restickler_version} to ${tmp_version}?"; then
+        $dryrunexec mv "$tmpdl" "$self" || _error "Failed to replace $self with $tmpdl";
     fi
     rm -f "$tmpdl" || true;
     exit 0;

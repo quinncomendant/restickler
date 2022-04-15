@@ -14,7 +14,8 @@ export RESTIC_PASSWORD_COMMAND='security find-generic-password -a restic -s rest
 # GCP Service Account credentials.
 # https://console.cloud.google.com/iam-admin/serviceaccounts
 export GOOGLE_PROJECT_ID='YOUR_PROJECT_ID';
-export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/restickler/YOUR_SERVICE_ACCOUNT_KEY_FILE.json"; # ← Set minimum permissions on this file (`chmod 640 …`).
+# Set minimum permissions on this file (`chmod 640 …`).
+export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/restickler/YOUR_SERVICE_ACCOUNT_KEY_FILE.json";
 
 # The repository to backup to and restore from.
 # https://console.cloud.google.com/storage/browser
