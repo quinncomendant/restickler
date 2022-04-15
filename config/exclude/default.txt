@@ -11,7 +11,7 @@ $HOME/Library/Application Support/**/File System
 
 # Then selectively include the directories you want to back up by prefixing them with `!`:
 !$HOME/Library/Application Support
-!$HOME/Library/Keychains
+!$HOME/Library/Keychains/*.keychain-db
 !$HOME/Library/Mail
 !$HOME/Library/Preferences
 !$HOME/Library/Scripts
