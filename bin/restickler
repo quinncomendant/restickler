@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.10';
+restickler_version='1.0.11';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -40,12 +40,13 @@ do_check_idle='';
 do_check_battery='';
 do_check_hotspot='';
 do_check_internet='';
-do_self_update='';
-do_install_config='';
+run_self_update='';
+run_install_config='';
 backup_interval_hours=0; # By default, back up every time.
 forget_interval_hours=24; # 1 day
 prune_interval_hours=240; # 10 days
 check_interval_hours=168; # 7 days
+sent_healthchecks_start='';
 
 #
 # Functions
@@ -362,9 +363,11 @@ function _restic_backup() {
         exit 1;
     fi
 
-    # Send “start” signal to HealthChecks.io when run via cron.
-    # shellcheck disable=SC2015
-    [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} ]] && curl -fsS -X POST --data-binary "Starting back up of $*" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+    # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
+    if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
+        curl -fsS -X POST --data-binary "Starting back up of $*" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        sent_healthchecks_start=1;
+    fi
 
     _info "Starting back up";
     local limit_download limit_upload;
@@ -379,9 +382,7 @@ function _restic_backup() {
     # Save the timestamp of when this script began running to the `last-backup-time-…` file.
     [[ -z $dryrun ]] && echo -n "$script_start_time" >| "$last_backup_time_file";
 
-    # Send “success” signal to HealthChecks.io when run via cron.
-    # shellcheck disable=SC2015
-    [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} ]] && curl -fsS -X POST --data-binary "Finished back up ($(_elapsed) elapsed)" --retry 3 "${HEALTHCHECKS_URL}" >/dev/null || true;
+    return 0;
 }
 
 function _restic_test_restore() {
@@ -403,6 +404,8 @@ function _restic_test_restore() {
         2>&1 | tee -a "${log_file}" | { grep -v '^restoring' || true; } || _error "Failed to restore ($(_elapsed) elapsed)"
 
     [[ -n $dryrun ]] || diff "${canary_file}" "$tmp_dir/restickler/restore/${canary_file}" >/dev/null || _error "Restored canary doesn’t match backed-up version ($(_elapsed) elapsed)"
+
+    return 0;
 }
 
 function _restic_forget() {
@@ -423,6 +426,12 @@ function _restic_forget() {
 
     _repository_is_locked forget && return 1;
 
+    # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
+    if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
+        curl -fsS -X POST --data-binary "Starting forget" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        sent_healthchecks_start=1;
+    fi
+
     _info "Starting forget";
     local limit_download limit_upload;
     limit_download=$(convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
@@ -440,6 +449,8 @@ function _restic_forget() {
 
     # Save the timestamp of successful forget.
     [[ -z $dryrun ]] && echo -n "$script_start_time" >| "$state_dir/last-forget-time";
+
+    return 0;
 }
 
 function _restic_prune() {
@@ -470,6 +481,12 @@ function _restic_prune() {
 
     _repository_is_locked prune && return 1;
 
+    # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
+    if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
+        curl -fsS -X POST --data-binary "Starting prune" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        sent_healthchecks_start=1;
+    fi
+
     _info "Starting prune";
     local limit_download limit_upload;
     limit_download=$(convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
@@ -481,6 +498,8 @@ function _restic_prune() {
 
     # Save the timestamp of successful prune.
     [[ -z $dryrun ]] && echo -n "$script_start_time" >| "$state_dir/last-prune-time";
+
+    return 0;
 }
 
 function _restic_check() {
@@ -511,6 +530,12 @@ function _restic_check() {
 
     _repository_is_locked check && return 1;
 
+    # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
+    if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
+        curl -fsS -X POST --data-binary "Starting check" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        sent_healthchecks_start=1;
+    fi
+
     _info "Starting check";
     # Check might be redundant with `prune`, except for the doubt in this comment: https://forum.restic.net/t/should-i-run-restic-check/1227/9?u=quinncom
     # Verify 1/52th of the total repo data every week.
@@ -524,6 +549,8 @@ function _restic_check() {
 
     # Save the timestamp of successful check.
     [[ -z $dryrun ]] && echo -n "$script_start_time" >| "$state_dir/last-check-time";
+
+    return 0;
 }
 
 
@@ -554,8 +581,8 @@ while getopts "b:c:d:e:f:hnp:qu:vABHIV-:" opt ; do
         (I) do_check_internet=1;;
         (V) echo -n "restickler ${restickler_version} ($([[ -x $(command -v restic) ]] && restic version))"; exit 0;;
         (-) case $OPTARG in
-            (self-update) do_self_update=1;;
-            (install-config) do_install_config=1;;
+            (self-update) run_self_update=1;;
+            (install-config) run_install_config=1;;
             (help) _usage;;
             (?) _error "Invalid option: \`$OPTARG\`. Use option -h for help.";;
         esac ;;
@@ -643,15 +670,27 @@ fi
 # Go!
 #
 
-[[ -n $do_install_config ]] && _install_config;
-[[ -n $do_self_update ]] && _self_update;
+[[ -n $run_install_config ]] && _install_config;
+[[ -n $run_self_update ]] && _self_update;
 
 _info "Starting restickler $* to ${RESTIC_REPOSITORY}";
 
-# shellcheck disable=SC2015
-_restic_backup "$@" && _restic_test_restore "$@" || true;
-_restic_forget || true;
-_restic_prune || true;
-_restic_check || true;
+tasks=();
+_restic_backup "$@" && echo _restic_test_restore "$@" && tasks+=('back up');
+_restic_forget && tasks+=('forget');
+_restic_prune && tasks+=('prune');
+_restic_check && tasks+=('check');
 
-_info "Finished ($(_elapsed) elapsed)";
+# Format a string of tasks that completed successfully.
+case ${#tasks[@]} in
+    (0) tasks_list='0 tasks';;
+    (1) tasks_list="1 task: ${tasks[*]}";;
+    (*) tasks_list="${#tasks[@]} tasks: $(printf '%s, ' "${tasks[@]}")";;
+esac
+_info "Finished ${tasks_list%, } ($(_elapsed) elapsed)";
+
+# Send “success” signal to HealthChecks.io when run via cron, but only if a /start ping was sent (which only occurs when a main action begins, i.e., back up, forget, prune, or check).
+# shellcheck disable=SC2015
+if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -n $sent_healthchecks_start ]]; then
+    curl -fsS -X POST --data-binary "Finished ${tasks_list%, } ($(_elapsed) elapsed)" --retry 3 "${HEALTHCHECKS_URL}" >/dev/null || true;
+fi
