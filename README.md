@@ -9,7 +9,7 @@ Restickler is considered “beta quality” software, and is in active developme
 - Run back up and maintenance functions (forget, prune, and check) on a minimal interval schedule. E.g., schedule back up to every 3 hours with `-b 3`, and prune every 3 days with `-p 72`.
 - Skip if there has been no user activity since last back up (`-A`), if on battery power (`-B`), if tethered to an iOS hotspot (`-H`), or if internet is unreliable (`-I`) (macOS only).
 - Limit upload and download speed as a percentage of available bandwidth, e.g., `-u 50% -d 50%` (macOS only).
-- Test restoring a unique “canary” file after every back up (when ~/.config/ is included in the set of SOURCE files). Its file name is a ISO 8601 timestamp in UTC, to confirm when a backup was created.
+- Test restoring a unique “canary” file after every back up. This verifies that back up and restore are working.
 - Receive notifications of errors and back up delays via [Healthchecks.io](https://healthchecks.io/) (optional).
 
 ## Install
