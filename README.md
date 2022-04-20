@@ -153,7 +153,6 @@ upload and download limited to 75% of available bandwidth (cron needs % to be es
 
 - The retention policy applied with `restic forget` is currently hard coded; it should be configurable via --keep-hourly, --keep-daily, etc.
 - Improve configuration of logging level. Currently using -v[-v[-v]] to include more in logs, but would be nice to have a dedicated --log-level option.
-- Add canary test file to every back up set, not just when SOURCE includes ~/.config/.
 
 ## License
 

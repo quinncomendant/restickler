@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.11';
+restickler_version='1.0.12';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -23,9 +23,10 @@ config_dir=${XDG_CONFIG_HOME:-$HOME/.config/restickler};
 state_dir=${XDG_STATE_HOME:-$HOME/.local/state/restickler};
 tmp_dir=/tmp;
 log_file="$state_dir/log";
+canary_file='';
 
 # Set up required directories.
-mkdir -p "$config_dir/canary" "$config_dir/exclude" "$state_dir" "$tmp_dir/restickler/restore/$config_dir/canary";
+mkdir -p "$config_dir/exclude" "$state_dir" "$tmp_dir/restickler/restore";
 touch "${log_file}";
 
 # Default configuration options.
@@ -92,7 +93,7 @@ OPTIONS
 Restickler runs the following commands to maintain the full lifecycle of a healthy repository:
 
     1. \`restic backup\` (every ${backup_interval_hours} hours or as specified by -b)
-    2. \`restic restore\` (restore test file from \`$config_dir/canary/UTC_DATE_TIME\`)
+    2. \`restic restore\` (restore test file from SOURCE1/.restickler-canary/UTC_DATE_TIME)
     3. \`restic forget\` (every ${forget_interval_hours} hours or as specified by -f)
     4. \`restic prune\` (every ${prune_interval_hours} hours or as specified by -p)
     5. \`restic check\` (every ${check_interval_hours} hours or as specified by -c)
@@ -369,6 +370,14 @@ function _restic_backup() {
         sent_healthchecks_start=1;
     fi
 
+    # Create a “canary” file in the first path argument. A canary file is 1KB of random data which is used to test restore.
+    if [[ -d "$1" && -w "$1" ]]; then
+        canary_file="${1}/.restickler-canary/$(TZ=UTC date '+%FT%H%M%SZ')";
+        mkdir -p "${1}/.restickler-canary" "${tmp_dir}/restickler/restore/${1}/.restickler-canary" || _error "Failed to create temporary directories: \`${1}/.restickler-canary\`, \`${tmp_dir}/restickler/restore/${1}/.restickler-canary\`";
+        find "${1}/.restickler-canary" "${tmp_dir}/restickler/restore/${1}/.restickler-canary" -type f -delete 2>/dev/null || true;
+        head -c 1024 /dev/urandom > "$canary_file";
+    fi
+
     _info "Starting back up";
     local limit_download limit_upload;
     limit_download=$(convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
@@ -386,24 +395,20 @@ function _restic_backup() {
 }
 
 function _restic_test_restore() {
-    # shellcheck disable=SC2076
-    if [[ ! $(printf ':%s:' "$@") =~ ":$HOME:" ]]; then
-        _info "Skipping test restore because $HOME does not match any source argument";
+    if [[ -z $canary_file || ! -s "$canary_file" ]]; then
+        _warning "Unable to test restore on $1 (canary file not found)";
         return 1;
     fi
-
     _info "Starting test restore";
-    local limit_download limit_upload latest_snapshot;
-    limit_download=$(convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
-    limit_upload=$(convert_limit "$ul_limit" ".ul_throughput" "--limit-upload");
-    latest_snapshot=$(restic snapshots --json --path "$HOME" latest | jq -r '.[0].short_id');
+    local latest_snapshot;
+    [[ -n $dryrun ]] || latest_snapshot=$(restic snapshots --json --path "$1" latest | jq -re '.[0].short_id' || _error "Failed to find a snapshot with the canary file");
     # shellcheck disable=SC2086
-    $dryrunexec $caffeinate restic $quiet $verbose $limit_download $limit_upload restore "$latest_snapshot" \
+    $dryrunexec $caffeinate restic $quiet $verbose restore "$latest_snapshot" \
         --target "$tmp_dir/restickler/restore" \
-        --include "$config_dir/canary" \
+        --include "$canary_file" \
         2>&1 | tee -a "${log_file}" | { grep -v '^restoring' || true; } || _error "Failed to restore ($(_elapsed) elapsed)"
 
-    [[ -n $dryrun ]] || diff "${canary_file}" "$tmp_dir/restickler/restore/${canary_file}" >/dev/null || _error "Restored canary doesn’t match backed-up version ($(_elapsed) elapsed)"
+    [[ -n $dryrun ]] || diff "$canary_file" "$tmp_dir/restickler/restore/${canary_file}" >/dev/null || _error "Restored canary ${canary_file} doesn’t match backed-up version ($(_elapsed) elapsed)"
 
     return 0;
 }
@@ -628,7 +633,14 @@ _trap() {
         (INT|TERM) _error "Restickler terminated via ${sig} ($(_elapsed) elapsed)";;
         (ERR) _error "Exit status ${status} on line ${line}: \`${BASH_COMMAND}\` ($(_elapsed) elapsed)";;
         # Trap EXIT must occur after the lock test, otherwise the exit would remove the lock used by the other process.
-        (EXIT) rm -fr "$tmp_dir/restickler/lock";;
+        (EXIT)
+            rm -fr "$tmp_dir/restickler/lock";
+            local canary_dir;
+            canary_dir=$(dirname "$canary_file");
+            if [[ $canary_dir == */.restickler-canary ]]; then
+                rm -fr "$canary_dir";
+            fi
+            ;;
         (*) _error "Unhandled signal ${sig} with status ${status} on line ${line}";;
     esac
 }
@@ -657,15 +669,6 @@ fi
 # Make sure the remote repository exists.
 restic snapshots >/dev/null || _error "Failed to connect to repository ${RESTIC_REPOSITORY}";
 
-# Generate a “canary” file to test restore later. A 10KB file * 24 * 365 * 10 ≈ 855 MB per decade.
-# Only when the home directory is in the set of sources, because we need $config_dir/canary in the backup.
-canary_file="$config_dir/canary/$(TZ=UTC date '+%FT%H%M%SZ')";
-# shellcheck disable=SC2076
-if [[ $(printf ':%s:' "$@") =~ ":$HOME:" ]]; then
-    find "$config_dir/canary" "$tmp_dir/restickler/restore/$config_dir/canary" -type f -delete;
-    head -c 10240 /dev/urandom > "$canary_file"
-fi
-
 #
 # Go!
 #
@@ -676,7 +679,7 @@ fi
 _info "Starting restickler $* to ${RESTIC_REPOSITORY}";
 
 tasks=();
-_restic_backup "$@" && echo _restic_test_restore "$@" && tasks+=('back up');
+_restic_backup "${@%/}" && _restic_test_restore "${@%/}" && tasks+=('back up');
 _restic_forget && tasks+=('forget');
 _restic_prune && tasks+=('prune');
 _restic_check && tasks+=('check');
