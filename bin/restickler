@@ -217,7 +217,7 @@ function _error() {
     echo -e "[${dt}] [error] $* ($(_elapsed) elapsed)" | tee -a "$log_file" 1>&2
     # Send “fail” signal to HealthChecks.io when run via cron.
     # shellcheck disable=SC2015
-    [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} ]] && curl -fsS -X POST --data-binary "[$(hostname -s)] $*" --retry 3 "${HEALTHCHECKS_URL}/fail" >/dev/null || true;
+    [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} ]] && curl -fsS -A "$(hostname -s)" -X POST --data-binary "$*" --retry 3 "${HEALTHCHECKS_URL}/fail" >/dev/null || true;
     # Send a user-defined USR1 signal, which is trapped to exit the main process.
     kill -USR1 $$;
 }
@@ -366,7 +366,7 @@ function _restic_backup() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -X POST --data-binary "[$(hostname -s)] Starting back up of $*" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$(hostname -s)" -X POST --data-binary "Starting back up of $*" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -433,7 +433,7 @@ function _restic_forget() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -X POST --data-binary "[$(hostname -s)] Starting forget" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$(hostname -s)" -X POST --data-binary "Starting forget" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -488,7 +488,7 @@ function _restic_prune() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -X POST --data-binary "[$(hostname -s)] Starting prune" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$(hostname -s)" -X POST --data-binary "Starting prune" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -537,7 +537,7 @@ function _restic_check() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -X POST --data-binary "[$(hostname -s)] Starting check" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$(hostname -s)" -X POST --data-binary "Starting check" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -695,5 +695,5 @@ _info "Finished ${tasks_list%, } ($(_elapsed) elapsed)";
 # Send “success” signal to HealthChecks.io when run via cron, but only if a /start ping was sent (which only occurs when a main action begins, i.e., back up, forget, prune, or check).
 # shellcheck disable=SC2015
 if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -n $sent_healthchecks_start ]]; then
-    curl -fsS -X POST --data-binary "[$(hostname -s)] Finished ${tasks_list%, } on $* ($(_elapsed) elapsed)" --retry 3 "$HEALTHCHECKS_URL" >/dev/null || true;
+    curl -fsS -A "$(hostname -s)" -X POST --data-binary "Finished ${tasks_list%, } on $* ($(_elapsed) elapsed)" --retry 3 "$HEALTHCHECKS_URL" >/dev/null || true;
 fi
