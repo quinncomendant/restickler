@@ -93,7 +93,7 @@ OPTIONS
 Restickler runs the following commands to maintain the full lifecycle of a healthy repository:
 
     1. `restic backup` (every 0 hours or as specified by -b)
-    2. `restic restore` (restore test file from `~/.config/restickler/canary/UTC_DATE_TIME`)
+    2. `restic restore` (restore test file from SOURCE1/.restickler-canary/UTC_DATE_TIME)
     3. `restic forget` (every 24 hours or as specified by -f)
     4. `restic prune` (every 240 hours or as specified by -p)
     5. `restic check` (every 168 hours or as specified by -c)
