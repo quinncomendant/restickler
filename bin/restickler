@@ -378,7 +378,7 @@ function _restic_backup() {
         head -c 1024 /dev/urandom > "$canary_file";
     fi
 
-    _info "Starting back up";
+    _info "Starting back up of $*";
     local limit_download limit_upload;
     limit_download=$(convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
     limit_upload=$(convert_limit "$ul_limit" ".ul_throughput" "--limit-upload");
@@ -695,5 +695,5 @@ _info "Finished ${tasks_list%, } ($(_elapsed) elapsed)";
 # Send “success” signal to HealthChecks.io when run via cron, but only if a /start ping was sent (which only occurs when a main action begins, i.e., back up, forget, prune, or check).
 # shellcheck disable=SC2015
 if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -n $sent_healthchecks_start ]]; then
-    curl -fsS -X POST --data-binary "Finished ${tasks_list%, } ($(_elapsed) elapsed)" --retry 3 "$HEALTHCHECKS_URL" >/dev/null || true;
+    curl -fsS -X POST --data-binary "Finished ${tasks_list%, } on $* ($(_elapsed) elapsed)" --retry 3 "$HEALTHCHECKS_URL" >/dev/null || true;
 fi
