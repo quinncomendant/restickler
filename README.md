@@ -40,14 +40,14 @@ Restickler is considered “beta quality” software, and is in active developme
 4. Initialize the backup destination, e.g., if using GCP Storage: `source ~/.config/restickler/env && restic -r gs:YOUR_BUCKET_NAME:/ init`
 5. Test your configuration with a dry-run: `restickler -vn $HOME`
 6. Back up your home directory: `restickler -v $HOME`
-7. Automatically back up hourly by adding this to `crontab -e`:
+7. Automatically back up hourly by adding this to `crontab -e` (all features enabled for macOS):
 
     ```cron
     PATH=/Users/YOUR_USERNAME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
     * * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 $HOME >/dev/null
     ```
     
-(For restic to have permission to access your files you may need to give `cron` [Full Disk Access](https://send.strangecode.com/f/screen-shot-2022-04-10-at-13-25-23.png) in *System Preferences → Security & Privacy → Privacy → Full Disk Access → (click + and select `/usr/sbin/cron`)*)
+(For restic to have permission to access your files on macOS you may need to give `cron` [Full Disk Access](https://send.strangecode.com/f/screen-shot-2022-04-10-at-13-25-23.png) in *System Preferences → Security & Privacy → Privacy → Full Disk Access → (click + and select `/usr/sbin/cron`)*)
 
 ## Update
 
@@ -142,11 +142,12 @@ the `~/.local/state/restickler/last-*-time*` files would also reset the interval
 
     restickler -b 0 -f 0 -p 0 -c 0 $HOME
 
-A sane configuration for crontab: double verbosity to log files as they upload,
-skip back up when idle, on battery, using hotspot, or unreliable internet, with
-upload and download limited to 75% of available bandwidth (cron needs % to be escaped):
+A sane configuration for crontab on macOS: double verbosity to log files as they upload,
+skip back up when idle, on battery, using hotspot, or unreliable internet, with upload
+and download limited to 75% of available bandwidth (cron needs % to be escaped). Although
+it runs every 5 minutes, back up will happen at most only once per hour:
 
-    */7 * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 $HOME >/dev/null
+    */5 * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 $HOME >/dev/null
 ```
 
 ## To do

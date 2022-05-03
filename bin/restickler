@@ -142,11 +142,12 @@ the \`${state_dir}/last-*-time*\` files would also reset the interval timer):
 
     restickler -b 0 -f 0 -p 0 -c 0 \$HOME
 
-A sane configuration for crontab: double verbosity to log files as they upload,
-skip back up when idle, on battery, using hotspot, or unreliable internet, with
-upload and download limited to 75% of available bandwidth (cron needs % to be escaped):
+A sane configuration for crontab on macOS: double verbosity to log files as they upload,
+skip back up when idle, on battery, using hotspot, or unreliable internet, with upload
+and download limited to 75% of available bandwidth (cron needs % to be escaped). Although
+it runs every 5 minutes, back up will happen at most only once per hour:
 
-    */7 * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 \$HOME >/dev/null
+    */5 * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 \$HOME >/dev/null
 " | sed "s!${HOME}!~!g" 1>&2
     exit 1;
 }
