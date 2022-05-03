@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.12';
+restickler_version='1.0.13';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -310,7 +310,7 @@ function _on_battery_power() {
 
 function _connected_to_hotspot() {
     # Return true if connected to an iOS Personal Hotspot (which seems to reliably assign an IP address in the 172.20.10.xxx range).
-    [[ -x $(command -v networksetup) ]] && networksetup -listallnetworkservices | grep -v 'An asterisk' | xargs networksetup -getinfo | grep -q 'IP address: 172\.20\.10\.';
+    [[ -x $(command -v networksetup) ]] && networksetup -listallnetworkservices | grep -v '\*' | tr '\n' '\0' | xargs -0 -n 1 networksetup -getinfo 2>&1 | grep -q 'IP address: 172\.20\.10\.';
     # Return exit status of last command (required because pipefail flag is on).
     return "${PIPESTATUS[${#PIPESTATUS[@]}-1]}";
 }
