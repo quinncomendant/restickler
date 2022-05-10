@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.13';
+restickler_version='1.0.14';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -365,6 +365,8 @@ function _restic_backup() {
         exit 1;
     fi
 
+    _repository_is_locked backup && return 1;
+
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
         curl -fsS -A "$(hostname -s)" -X POST --data-binary "Starting back up of $*" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
@@ -402,7 +404,7 @@ function _restic_test_restore() {
     fi
     _info "Starting test restore";
     local latest_snapshot;
-    [[ -n $dryrun ]] || latest_snapshot=$(restic snapshots --json --path "$1" latest | jq -re '.[0].short_id' || _error "Failed to find a snapshot with the canary file");
+    [[ -n $dryrun ]] || latest_snapshot=$(restic --no-lock snapshots --json --path "$1" latest | jq -re '.[0].short_id' || _error "Failed to find a snapshot with the canary file");
     # shellcheck disable=SC2086
     $dryrunexec $caffeinate restic $quiet $verbose restore "$latest_snapshot" \
         --target "${tmp_dir}/restickler/restore" \
@@ -668,7 +670,10 @@ if ! _online; then
 fi
 
 # Make sure the remote repository exists.
-restic snapshots >/dev/null || _error "Failed to connect to repository ${RESTIC_REPOSITORY}";
+if ! restic --no-lock snapshots >/dev/null; then
+    _warning "Failed to connect to repository ${RESTIC_REPOSITORY}";
+    exit 0;
+fi
 
 #
 # Go!
