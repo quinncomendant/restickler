@@ -81,9 +81,15 @@ $HOME/var
 *-20[0-9][0-9][0-1][0-9][0-3][0-9].gz
 *-20[0-9][0-9][0-1][0-9][0-3][0-9].tar.gz
 *-20[0-9][0-9][0-1][0-9][0-3][0-9].tgz
+*.crdownload
+*.download
 *.err
 *.lock
 *.noindex
+*.part
+*.partial
+*.temp
+*.tmp
 *Cache-wal*
 *[._]log
 *[._]log.[0-9]
