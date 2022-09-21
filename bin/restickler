@@ -660,7 +660,7 @@ caffeinate='';
 # Load environment variables used by restic and restickler.
 # shellcheck disable=SC1091
 [[ -f "${config_dir}/env" ]] && source "${config_dir}/env";
-if [[ -z $RESTIC_REPOSITORY || ( -z $RESTIC_PASSWORD_COMMAND && -z $RESTIC_PASSWORD ) ]]; then
+if [[ -z ${RESTIC_REPOSITORY:-} || ( -z ${RESTIC_PASSWORD_COMMAND:-} && -z ${RESTIC_PASSWORD:-} ) ]]; then
     _error "Missing restic environment variable(s): RESTIC_REPOSITORY and/or RESTIC_PASSWORD_COMMAND; see https://restic.readthedocs.io/en/latest/040_backup.html#environment-variables";
 fi
 
