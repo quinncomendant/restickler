@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.14';
+restickler_version='1.0.16';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -624,7 +624,7 @@ if [[ "$restic_min_version" != "$(echo -e "${restic_installed_version}\n${restic
 fi
 
 # Enforce single-instance execution (via mkdir, which creates atomic lock and check at once).
-mkdir "${tmp_dir}/restickler/lock" 2>/dev/null || ( _info "Another restickler process is awaiting completion."; exit 1; );
+mkdir "${tmp_dir}/restickler/lock" 2>/dev/null || ( _info "Another restickler process is awaiting completion (lock exists: ${tmp_dir}/restickler/lock)."; exit 1; );
 
 # networkQuality results are regenerated each time restickler runs.
 rm -f "${state_dir}/network_quality.json";
