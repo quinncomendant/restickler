@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.16';
+restickler_version='1.0.17';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -419,6 +419,11 @@ function _restic_test_restore() {
 function _restic_forget() {
     if [[ -s "${state_dir}/last-forget-time" && $(<"${state_dir}/last-forget-time") -gt $((script_start_time - (60 * 60 * forget_interval_hours))) ]]; then
         _info "Skipping forget (last ran $(bc <<<"scale=1; (${script_start_time} - $(<"${state_dir}/last-forget-time")) / 60 / 60") hours ago)";
+        return 1;
+    fi
+
+    if [[ -n $do_check_hotspot ]] && _connected_to_hotspot; then
+        _info "Skipping forget while connected to hotspot";
         return 1;
     fi
 

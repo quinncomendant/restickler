@@ -38,10 +38,10 @@ $HOME/.Trash
 $HOME/.zhistory*
 $HOME/.zsh_history*
 $HOME/Applications
+$HOME/Downloads/**/*.7z
 $HOME/Downloads/**/*.avi
 $HOME/Downloads/**/*.djvu
 $HOME/Downloads/**/*.dmg
-$HOME/Downloads/**/*.epub
 $HOME/Downloads/**/*.gz
 $HOME/Downloads/**/*.iso
 $HOME/Downloads/**/*.m4a
@@ -53,7 +53,9 @@ $HOME/Downloads/**/*.mp4
 $HOME/Downloads/**/*.pdf
 $HOME/Downloads/**/*.rar
 $HOME/Downloads/**/*.tar
+$HOME/Downloads/**/*.tbz
 $HOME/Downloads/**/*.tgz
+$HOME/Downloads/**/*.xz
 $HOME/Downloads/**/*.zip
 $HOME/go
 $HOME/mbox
