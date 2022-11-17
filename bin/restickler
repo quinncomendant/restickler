@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.0.17';
+restickler_version='1.1.0';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -246,12 +246,31 @@ function _online {
     return "$i";
 }
 
+function _simple_speedtest() {
+    local megabytes=${1:-2} concurrency=${2:-5} bytes dl_raw dl_bps ul_raw ul_bps;
+    bytes=$((megabytes*1024*1024/concurrency));
+
+    # Download test in parallel; sum download speeds excluding connection time.
+    dl_raw=$(curl -sfZ --connect-timeout 3 --parallel-immediate -H "Range: bytes=0-$bytes" -w "(%{size_download} / (%{time_total} - %{time_starttransfer})) +" $(for ((i=1; i<=$concurrency; i++)); do echo -n 'https://mensura.cdn-apple.com/api/v1/gm/large -o /dev/null '; done) 2>/dev/null || true);
+    dl_bps=$(bc <<<"scale=0; (${dl_raw} 0) * 8");
+
+    # Upload random data in parallel; the /slurp endpoint returns json with a BPS value that we sum for the total bytes/second that are transfered during this test.
+    ul_raw=$(head -c $bytes /dev/random | curl -sfZ --connect-timeout 3 --parallel-immediate --data-binary '@-' $(for ((i=1; i<=$concurrency; i++)); do echo -n 'https://mensura.cdn-apple.com/api/v1/gm/slurp '; done) 2>/dev/null || true);
+    ul_bps=$(jq -e . <<<"$ul_raw" &>/dev/null && jq 'reduce inputs.BPS as $n (.; .BPS += ($n * 8)) | .BPS' <<<"$ul_raw" || true);
+
+    # Save a json with the keys we use in the same format used by the networkQuality command.
+    # Throughput values are in bits/second.
+    echo "{\"dl_responsiveness\": 1000, \"dl_throughput\": ${dl_bps:-0}, \"ul_responsiveness\": 1000, \"ul_throughput\": ${ul_bps:-0}}";
+}
+
 function _network_quality() {
     # Return cached internet speed test results from macOS's `networkQuality` command (only available on macOS 12+).
     local jqfilter=${1:-.};
 
-    if [[ ! -s "${state_dir}/network_quality.json" && -x $(command -v networkQuality) && ($do_check_internet || $dl_limit == *% || $ul_limit == *%) ]]; then
-        networkQuality -cs >| "${state_dir}/network_quality.json" || true;
+    if [[ ! -s "${state_dir}/network_quality.json" && ($do_check_internet || $dl_limit == *% || $ul_limit == *%) ]]; then
+        # Replace `_simple_speedtest` with `networkQuality -cs` to use the macOS built-in tool.
+        _simple_speedtest >| "${state_dir}/network_quality.json";
+        # [[ -x $(command -v networkQuality) ]] && networkQuality -cs >| "${state_dir}/network_quality.json" || true;
         [[ -s "${state_dir}/network_quality.json" ]] && _debug "$(jq -r '"Network DL speed: \(.dl_throughput) UL speed: \(.ul_throughput) UL responsiveness: \(.ul_responsiveness)"' "${state_dir}/network_quality.json")";
     fi
 
@@ -631,7 +650,7 @@ fi
 # Enforce single-instance execution (via mkdir, which creates atomic lock and check at once).
 mkdir "${tmp_dir}/restickler/lock" 2>/dev/null || ( _info "Another restickler process is awaiting completion (lock exists: ${tmp_dir}/restickler/lock)."; exit 1; );
 
-# networkQuality results are regenerated each time restickler runs.
+# Internet speed test results are regenerated each time restickler runs.
 rm -f "${state_dir}/network_quality.json";
 
 _trap() {
