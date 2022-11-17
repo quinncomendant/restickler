@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.1.0';
+restickler_version='1.1.1';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -247,15 +247,16 @@ function _online {
 }
 
 function _simple_speedtest() {
-    local megabytes=${1:-2} concurrency=${2:-5} bytes dl_raw dl_bps ul_raw ul_bps;
-    bytes=$((megabytes*1024*1024/concurrency));
+    local megabytes=${1:-2} concurrency=${2:-8} dl_bytes ul_bytes dl_raw dl_bps ul_raw ul_bps;
+    dl_bytes=$((megabytes*1024*1024/concurrency));
+    ul_bytes=$((dl_bytes/2)); # UL is accurate using half as much data.
 
     # Download test in parallel; sum download speeds excluding connection time.
-    dl_raw=$(curl -sfZ --connect-timeout 3 --parallel-immediate -H "Range: bytes=0-$bytes" -w "(%{size_download} / (%{time_total} - %{time_starttransfer})) +" $(for ((i=1; i<=$concurrency; i++)); do echo -n 'https://mensura.cdn-apple.com/api/v1/gm/large -o /dev/null '; done) 2>/dev/null || true);
+    dl_raw=$(curl -sfZ --connect-timeout 3 --parallel-immediate -H "Range: bytes=0-${dl_bytes}" -w "(%{size_download} / (%{time_total} - %{time_starttransfer})) +" $(for ((i=1; i<=concurrency; i++)); do echo -n 'https://mensura.cdn-apple.com/api/v1/gm/large -o /dev/null '; done) 2>/dev/null || true);
     dl_bps=$(bc <<<"scale=0; (${dl_raw} 0) * 8");
 
     # Upload random data in parallel; the /slurp endpoint returns json with a BPS value that we sum for the total bytes/second that are transfered during this test.
-    ul_raw=$(head -c $bytes /dev/random | curl -sfZ --connect-timeout 3 --parallel-immediate --data-binary '@-' $(for ((i=1; i<=$concurrency; i++)); do echo -n 'https://mensura.cdn-apple.com/api/v1/gm/slurp '; done) 2>/dev/null || true);
+    ul_raw=$(head -c "$ul_bytes" /dev/random | curl -sfZ --connect-timeout 3 --parallel-immediate --data-binary '@-' $(for ((i=1; i<=concurrency; i++)); do echo -n 'https://mensura.cdn-apple.com/api/v1/gm/slurp '; done) 2>/dev/null || true);
     ul_bps=$(jq -e . <<<"$ul_raw" &>/dev/null && jq 'reduce inputs.BPS as $n (.; .BPS += ($n * 8)) | .BPS' <<<"$ul_raw" || true);
 
     # Save a json with the keys we use in the same format used by the networkQuality command.
