@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.1.1';
+restickler_version='1.1.2';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -246,17 +246,26 @@ function _online {
     return "$i";
 }
 
-function _simple_speedtest() {
-    local megabytes=${1:-2} concurrency=${2:-8} dl_bytes ul_bytes dl_raw dl_bps ul_raw ul_bps;
+function _speedtest() {
+    local megabytes=${1:-2} concurrency=${2:-8} dl_bytes ul_bytes config dl_url ul_url dl_raw dl_bps ul_raw ul_bps;
+
+    config=$(curl -s https://mensura.cdn-apple.com/api/v1/gm/config 2>/dev/null || true);
+    dl_url=$(jq -r '.urls.large_https_download_url' <<<"$config" 2>/dev/null || true);
+    ul_url=$(jq -r '.urls.https_upload_url' <<<"$config" 2>/dev/null || true);
+
+    if [[ -z $dl_url || -z $ul_url ]]; then
+        _error "Failed to get speed test config.";
+    fi
+
     dl_bytes=$((megabytes*1024*1024/concurrency));
     ul_bytes=$((dl_bytes/2)); # UL is accurate using half as much data.
 
     # Download test in parallel; sum download speeds excluding connection time.
-    dl_raw=$(curl -sfZ --connect-timeout 3 --parallel-immediate -H "Range: bytes=0-${dl_bytes}" -w "(%{size_download} / (%{time_total} - %{time_starttransfer})) +" $(for ((i=1; i<=concurrency; i++)); do echo -n 'https://mensura.cdn-apple.com/api/v1/gm/large -o /dev/null '; done) 2>/dev/null || true);
+    dl_raw=$(curl -sfZ --connect-timeout 3 --parallel-immediate -H "Range: bytes=0-${dl_bytes}" -w "(%{size_download} / (%{time_total} - %{time_starttransfer})) +" $(for ((i=1; i<=concurrency; i++)); do echo -n "${dl_url} -o /dev/null "; done) 2>/dev/null || true);
     dl_bps=$(bc <<<"scale=0; (${dl_raw} 0) * 8");
 
     # Upload random data in parallel; the /slurp endpoint returns json with a BPS value that we sum for the total bytes/second that are transfered during this test.
-    ul_raw=$(head -c "$ul_bytes" /dev/random | curl -sfZ --connect-timeout 3 --parallel-immediate --data-binary '@-' $(for ((i=1; i<=concurrency; i++)); do echo -n 'https://mensura.cdn-apple.com/api/v1/gm/slurp '; done) 2>/dev/null || true);
+    ul_raw=$(head -c "$ul_bytes" /dev/random | curl -sfZ --connect-timeout 3 --parallel-immediate --data-binary '@-' $(for ((i=1; i<=concurrency; i++)); do echo -n "${ul_url} "; done) 2>/dev/null || true);
     ul_bps=$(jq -e . <<<"$ul_raw" &>/dev/null && jq 'reduce inputs.BPS as $n (.; .BPS += ($n * 8)) | .BPS' <<<"$ul_raw" || true);
 
     # Save a json with the keys we use in the same format used by the networkQuality command.
@@ -269,8 +278,8 @@ function _network_quality() {
     local jqfilter=${1:-.};
 
     if [[ ! -s "${state_dir}/network_quality.json" && ($do_check_internet || $dl_limit == *% || $ul_limit == *%) ]]; then
-        # Replace `_simple_speedtest` with `networkQuality -cs` to use the macOS built-in tool.
-        _simple_speedtest >| "${state_dir}/network_quality.json";
+        # Replace `_speedtest` with `networkQuality -cs` to use the macOS built-in tool.
+        _speedtest >| "${state_dir}/network_quality.json";
         # [[ -x $(command -v networkQuality) ]] && networkQuality -cs >| "${state_dir}/network_quality.json" || true;
         [[ -s "${state_dir}/network_quality.json" ]] && _debug "$(jq -r '"Network DL speed: \(.dl_throughput) UL speed: \(.ul_throughput) UL responsiveness: \(.ul_responsiveness)"' "${state_dir}/network_quality.json")";
     fi
@@ -292,7 +301,7 @@ function _network_quality() {
     fi
 }
 
-function convert_limit() {
+function _convert_limit() {
     local limit=$1 metric=$2 arg=$3;
     # Convert UL and DL limits specified as a percentage into Mbps limits.
     if [[ $limit == *% ]]; then
@@ -403,8 +412,8 @@ function _restic_backup() {
 
     _info "Starting back up of $*";
     local limit_download limit_upload;
-    limit_download=$(convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
-    limit_upload=$(convert_limit "$ul_limit" ".ul_throughput" "--limit-upload");
+    limit_download=$(_convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
+    limit_upload=$(_convert_limit "$ul_limit" ".ul_throughput" "--limit-upload");
     # shellcheck disable=SC2086
     $caffeinate restic $quiet $verbose $limit_download $limit_upload backup "$@" \
         $exclude_file \
@@ -467,8 +476,8 @@ function _restic_forget() {
 
     _info "Starting forget";
     local limit_download limit_upload;
-    limit_download=$(convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
-    limit_upload=$(convert_limit "$ul_limit" ".ul_throughput" "--limit-upload");
+    limit_download=$(_convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
+    limit_upload=$(_convert_limit "$ul_limit" ".ul_throughput" "--limit-upload");
     # shellcheck disable=SC2086
     $caffeinate restic $quiet $verbose $limit_download $limit_upload forget \
         --keep-last 72 \
@@ -522,8 +531,8 @@ function _restic_prune() {
 
     _info "Starting prune";
     local limit_download limit_upload;
-    limit_download=$(convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
-    limit_upload=$(convert_limit "$ul_limit" ".ul_throughput" "--limit-upload");
+    limit_download=$(_convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
+    limit_upload=$(_convert_limit "$ul_limit" ".ul_throughput" "--limit-upload");
     # shellcheck disable=SC2086
     $caffeinate restic $quiet $verbose $limit_download $limit_upload prune \
         $dryrun \
@@ -573,8 +582,8 @@ function _restic_check() {
     # Check might be redundant with `prune`, except for the doubt in this comment: https://forum.restic.net/t/should-i-run-restic-check/1227/9?u=quinncom
     # Verify 1/52th of the total repo data every week.
     local limit_download limit_upload;
-    limit_download=$(convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
-    limit_upload=$(convert_limit "$ul_limit" ".ul_throughput" "--limit-upload");
+    limit_download=$(_convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
+    limit_upload=$(_convert_limit "$ul_limit" ".ul_throughput" "--limit-upload");
     # shellcheck disable=SC2086
     $dryrunexec $caffeinate restic $quiet $verbose $limit_download $limit_upload check \
         --read-data-subset="$(date +%V)/52" \
