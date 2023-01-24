@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.1.2';
+restickler_version='1.1.3';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -247,7 +247,7 @@ function _online {
 }
 
 function _speedtest() {
-    local megabytes=${1:-2} concurrency=${2:-8} dl_bytes ul_bytes config dl_url ul_url dl_raw dl_bps ul_raw ul_bps;
+    local megabytes=2 concurrency=8 dl_bytes ul_bytes config dl_url ul_url dl_raw dl_bps ul_raw ul_bps;
 
     config=$(curl -s https://mensura.cdn-apple.com/api/v1/gm/config 2>/dev/null || true);
     dl_url=$(jq -r '.urls.large_https_download_url' <<<"$config" 2>/dev/null || true);
@@ -261,12 +261,18 @@ function _speedtest() {
     ul_bytes=$((dl_bytes/2)); # UL is accurate using half as much data.
 
     # Download test in parallel; sum download speeds excluding connection time.
+    # shellcheck disable=SC2046
     dl_raw=$(curl -sfZ --connect-timeout 3 --parallel-immediate -H "Range: bytes=0-${dl_bytes}" -w "(%{size_download} / (%{time_total} - %{time_starttransfer})) +" $(for ((i=1; i<=concurrency; i++)); do echo -n "${dl_url} -o /dev/null "; done) 2>/dev/null || true);
     dl_bps=$(bc <<<"scale=0; (${dl_raw} 0) * 8");
 
     # Upload random data in parallel; the /slurp endpoint returns json with a BPS value that we sum for the total bytes/second that are transfered during this test.
+    # shellcheck disable=SC2046
     ul_raw=$(head -c "$ul_bytes" /dev/random | curl -sfZ --connect-timeout 3 --parallel-immediate --data-binary '@-' $(for ((i=1; i<=concurrency; i++)); do echo -n "${ul_url} "; done) 2>/dev/null || true);
+    # shellcheck disable=SC2015
     ul_bps=$(jq -e . <<<"$ul_raw" &>/dev/null && jq 'reduce inputs.BPS as $n (.; .BPS += ($n * 8)) | .BPS' <<<"$ul_raw" || true);
+
+    # Log how much data speedtest uses.
+    printf "%s\t${dl_bps:-0}\t${ul_bps:-0}\t$((megabytes*1024*1024))\t$((megabytes*1024*1024))\n" "$(date '+%F %T')" >> ~/var/speedtest.log
 
     # Save a json with the keys we use in the same format used by the networkQuality command.
     # Throughput values are in bits/second.
@@ -358,6 +364,17 @@ function _repository_is_locked() {
         return 0;
     fi
     return 1;
+}
+
+function _restic_unlock() {
+    if ! _online; then
+        _info "Skipping unlock because network is offline";
+        return 1;
+    fi
+
+    _info "Unlocking restic repository";
+    # shellcheck disable=SC2086
+    $dryrunexec $caffeinate restic $quiet $verbose unlock 2>&1 | tee -a "$log_file" || _error "Failed to back up"
 }
 
 function _restic_backup() {
@@ -621,7 +638,7 @@ while getopts "b:c:d:e:f:hnp:qu:vABHIV-:" opt ; do
         (B) do_check_battery=1;;
         (H) do_check_hotspot=1;;
         (I) do_check_internet=1;;
-        (V) echo -n "restickler ${restickler_version} ($([[ -x $(command -v restic) ]] && restic version))"; exit 0;;
+        (V) echo "restickler ${restickler_version} ($([[ -x $(command -v restic) ]] && restic version))"; exit 0;;
         (-) case $OPTARG in
             (self-update) run_self_update=1;;
             (install-config) run_install_config=1;;
@@ -667,7 +684,7 @@ _trap() {
     local status=$? sig=$1 line=$2;
     case $sig in
         (HUP) _info "Received SIGHUP; continuing anyways…";;
-        (INT|TERM) _error "Restickler terminated via ${sig}";;
+        (INT|TERM) _restic_unlock; _error "Restickler terminated via ${sig}";;
         (ERR) _error "Exit status ${status} on line ${line}: \`${BASH_COMMAND}\`";;
         # Trap EXIT must occur after the lock test, otherwise the exit would remove the lock used by the other process.
         (EXIT)
