@@ -30,6 +30,8 @@ $HOME/.cpan
 $HOME/.docker
 $HOME/.gem
 $HOME/.histfile*
+$HOME/.local/pipx
+$HOME/.local/share
 $HOME/.local/state
 $HOME/.node-gyp
 $HOME/.npm

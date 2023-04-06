@@ -2,7 +2,9 @@
 
 A wrapper for [restic](https://restic.net/) that supervises back up, forget, prune, check, and restore test. Designed for macOS, but works on Linux too.
 
-Restickler is considered “beta quality” software, and is in active development. Use at your own risk.
+![restickler logo](https://send.strangecode.com/f/restickler-hero.jpg)
+
+Restickler is stable as of v1.2.0. It runs impeccably on my macOS dev machine and Linux servers, but since your environment might be different, please use at your own risk. If you notice a glitch, please create an [issue](https://github.com/quinncomendant/restickler/issues).
 
 ## Features
 
@@ -47,7 +49,7 @@ Restickler is considered “beta quality” software, and is in active developme
     * * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 $HOME >/dev/null
     ```
     
-(For restic to have permission to access your files on macOS you may need to give `cron` [Full Disk Access](https://send.strangecode.com/f/screen-shot-2022-04-10-at-13-25-23.png) in *System Preferences → Security & Privacy → Privacy → Full Disk Access → (click + and select `/usr/sbin/cron`)*)
+(For restic to have permission to access your files on macOS you may need to give `cron` [Full Disk Access](https://send.strangecode.com/f/screen-shot-2022-04-10-at-13-25-23.png) in *System Preferences → Security & Privacy → Privacy → Full Disk Access → (click `+` and select `/usr/sbin/cron`)*)
 
 ## Update
 
@@ -149,6 +151,16 @@ it runs every 5 minutes, back up will happen at most only once per hour:
 
     */5 * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 $HOME >/dev/null
 ```
+
+## Troubleshooting
+
+If restickler stops backing up, check the `~/.local/state/restickler/log` file. Usually, a repository has a stale lock caused by an interrupted back up, with this appearing in the log:
+
+```
+Skipping backup because repository is locked
+```
+
+Fix this by running `source ~/.config/restickler/env && restic unlock` after confirming no restic processes are running.
 
 ## To do
 

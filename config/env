@@ -6,7 +6,7 @@
 # 2. Copy it from the login keychain to the System keychain (right-click copy in login → right-click paste in System).
 export RESTIC_PASSWORD_COMMAND='security find-generic-password -a restic -s restic-repository-pw -w';
 
-# On Linux you save your password to `~/.config/restickler/restic-repository-pw` (`chmod 640 …`) and
+# On Linux you save your password to `~/.config/restickler/restic-repository-pw` (`chmod 600 …`) and
 # set RESTIC_PASSWORD_COMMAND to 'cat ~/.config/restickler/restic-repository-pw'.
 # You may also use the RESTIC_PASSWORD variable, but this is less secure, because exported variables
 # containing credentials may be revealed accidentally.
@@ -22,5 +22,5 @@ export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/restickler/YOUR_SERVICE_ACC
 # https://console.cloud.google.com/storage/browser
 export RESTIC_REPOSITORY='';
 
-# The URL to ping for backup success or failure at Healthchecks.io.
+# The URL to ping for backup success or failure at Healthchecks.io (optional).
 export HEALTHCHECKS_URL='';
