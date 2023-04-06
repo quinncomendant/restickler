@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.2.0';
+restickler_version='1.2.1';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -667,8 +667,19 @@ while getopts "b:c:d:e:f:hnp:qu:vABHIV-:" opt ; do
         (*) _error "An unexpected error occurred.";;
     esac
 done
-[[ -n $exclude_file ]] && exclude_file="--exclude-file=${exclude_file}";
 shift $((OPTIND - 1));
+
+(($# == 0)) && _error "No source path provided to back up";
+if [[ -n $exclude_file ]]; then
+    [[ -f $exclude_file ]] || _error "Failed to find exclude file: $exclude_file";
+    exclude_file="--exclude-file=${exclude_file}";
+fi
+[[ -z $dl_limit || $dl_limit =~ ^[0-9]+(\.[0-9]+)?%?$ ]] || _error "Download speed limit must be a number (e.g., \`-d 10.5\`) or a percentage (e.g., \`-d 75%\`).";
+[[ -z $ul_limit || $ul_limit =~ ^[0-9]+(\.[0-9]+)?%?$ ]] || _error "Upload speed limit must be a number (e.g., \`-u 10.5\`) or a percentage (e.g., \`-u 75%\`).";
+[[ $backup_interval_hours =~ ^[0-9]+$ ]] || _error "Backup interval must be an integer (e.g., \`-b 1\`).";
+[[ $check_interval_hours =~ ^[0-9]+$ ]]  || _error "Check interval must be an integer (e.g., \`-c 168\`).";
+[[ $forget_interval_hours =~ ^[0-9]+$ ]] || _error "Forget interval must be an integer (e.g., \`-f 24\`).";
+[[ $prune_interval_hours =~ ^[0-9]+$ ]]  || _error "Prune interval must be an integer (e.g., \`-p 240\`).";
 
 # Additional arguments are backup sources. Verify them.
 for src in "$@"; do
