@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.2.3';
+restickler_version='1.2.4';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -41,8 +41,6 @@ do_check_idle='';
 do_check_battery='';
 do_check_hotspot='';
 do_check_internet='';
-run_self_update='';
-run_install_config='';
 backup_interval_hours=0; # By default, back up every time.
 forget_interval_hours=24; # 1 day
 prune_interval_hours=240; # 10 days
@@ -643,6 +641,20 @@ function _restic_check() {
 # Display help if run without arguments.
 [[ $# == 0 ]] && _usage;
 
+# Test dependencies.
+for requiredcmd in restic curl jq bc tr awk sed readlink curl; do
+    [[ -x $(command -v "$requiredcmd" || true) ]] || _error "The '$requiredcmd' command is not available";
+done
+
+restic_min_version='0.13.0';
+restic_installed_version=$(restic version | awk '{print $2}');
+if [[ "$restic_min_version" != "$(echo -e "${restic_installed_version}\n${restic_min_version}" | sort -V | head -1)" ]]; then
+    _error "This script requires restic >= $restic_min_version (installed version is ${restic_installed_version}). Upgrade with: \`$(readlink -f "$(which restic)") self-update\`.";
+fi
+
+caffeinate=''; # caffeinate is only available on macOS.
+[[ -x $(command -v caffeinate) ]] && caffeinate='caffeinate -i';
+
 # Process command line options.
 while getopts "b:c:d:e:f:hnp:qu:vABHIV-:" opt ; do
     case $opt in
@@ -663,8 +675,8 @@ while getopts "b:c:d:e:f:hnp:qu:vABHIV-:" opt ; do
         (I) do_check_internet=1;;
         (V) echo "restickler ${restickler_version} ($([[ -x $(command -v restic) ]] && restic version))"; exit 0;;
         (-) case $OPTARG in
-            (self-update) run_self_update=1;;
-            (install-config) run_install_config=1;;
+            (self-update) _self_update;;
+            (install-config) _install_config;;
             (help) _usage;;
             (version) echo "restickler ${restickler_version} ($([[ -x $(command -v restic) ]] && restic version))"; exit 0;;
             (?) _error "Invalid option: \`${OPTARG}\`. Use option -h for help.";;
@@ -692,22 +704,6 @@ for src in "$@"; do
     [[ $src =~ ^/ ]] || _error "Source directory “${src}” must be an absolute path";
     [[ -z $src || ! -d "$src" ]] && _error "Source directory “${src}” doesn’t exist";
 done
-
-# Test dependencies.
-[[ -x $(command -v restic) ]] || _error "The restic command is not available";
-[[ -x $(command -v curl) ]] || _error "The curl command is not available";
-[[ -x $(command -v jq) ]] || _error "The jq command is not available";
-[[ -x $(command -v bc) ]] || _error "The bc command is not available";
-[[ -x $(command -v tr) ]] || _error "The tr command is not available";
-[[ -x $(command -v awk) ]] || _error "The awk command is not available";
-[[ -x $(command -v readlink) ]] || _error "The readlink command is not available";
-[[ -x $(command -v curl) ]] || _error "The curl command is not available";
-
-restic_min_version='0.13.0';
-restic_installed_version=$(restic version | awk '{print $2}');
-if [[ "$restic_min_version" != "$(echo -e "${restic_installed_version}\n${restic_min_version}" | sort -V | head -1)" ]]; then
-    _error "This script requires restic >= $restic_min_version (installed version is ${restic_installed_version}). Upgrade with: \`$(readlink -f "$(which restic)") self-update\`.";
-fi
 
 # Enforce single-instance execution (via mkdir, which creates atomic lock and check at once).
 mkdir "${tmp_dir}/restickler/lock" 2>/dev/null || ( _info "Another restickler process is awaiting completion (lock exists: ${tmp_dir}/restickler/lock)."; exit 1; );
@@ -739,10 +735,6 @@ trap '_trap TERM $LINENO' TERM;
 trap '_trap ERR $LINENO' ERR;
 trap '_trap EXIT $LINENO' EXIT;
 
-# caffeinate is only available on macOS.
-caffeinate='';
-[[ -x $(command -v caffeinate) ]] && caffeinate='caffeinate -i';
-
 # Load environment variables used by restic and restickler.
 # shellcheck disable=SC1091
 [[ -f "${config_dir}/env" ]] && source "${config_dir}/env";
@@ -764,9 +756,6 @@ fi
 #
 # Go!
 #
-
-[[ -n $run_install_config ]] && _install_config;
-[[ -n $run_self_update ]] && _self_update;
 
 _info "Starting restickler $* to ${RESTIC_REPOSITORY}";
 
