@@ -10,14 +10,14 @@ Restickler is stable as of v1.2.0. It runs impeccably on my macOS dev machine an
 
 - Run back up and maintenance functions (forget, prune, and check) on a minimal interval schedule. E.g., schedule back up to every 3 hours with `-b 3`, and prune every 3 days with `-p 72`.
 - Skip if there has been no user activity since last back up (`-A`), if on battery power (`-B`), if tethered to an iOS hotspot (`-H`), or if internet is unreliable (`-I`) (macOS only).
-- Limit upload and download speed as a percentage of available bandwidth, e.g., `-u 50% -d 50%` (macOS only).
+- Limit upload and download speed as a percentage of available bandwidth, e.g., `-u 50% -d 50%`.
 - Test restoring a unique “canary” file after every back up. This verifies that back up and restore are working.
 - Receive notifications of errors and back up delays via [Healthchecks.io](https://healthchecks.io/) (optional).
 
 ## Install
 
 1. Install prerequisites: [restic](https://restic.readthedocs.io/en/latest/020_installation.html) and [jq](https://stedolan.github.io/jq/download/). Use [Homebrew](https://brew.sh/) to install on macOS: `brew install restic jq`
-2. Install the `restickler` script in `~/bin/`:
+2. Install the `restickler` script in `~/bin/` (or wherever you run scripts from):
 
     ```bash
     mkdir -p ~/bin
@@ -176,3 +176,9 @@ MIT License; see LICENSE for details.
 ## Disclaimer
 
 This software is provided by the copyright holders and contributors “as is” without support and without warranty as to its quality, merchantability, or fitness for a particular purpose.
+
+## Support
+
+Contact me on [Mastodon](https://mastodon.social/@com) or create a [GitHub issue](https://github.com/quinncomendant/restickler/issues).
+
+Do you find this free software useful? [Say thanks with a coffee!](https://ko-fi.com/strangecode)

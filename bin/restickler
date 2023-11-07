@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.2.1';
+restickler_version='1.2.3';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -74,7 +74,7 @@ OPTIONS
     -d MBPS|%         Limit download speed in Mb/s or as a percentage of available bandwidth.
     -e FILE           File containing back up exclusion rules, used as --exclude-file=FILE.
     -f HOURS          Min interval between forget operations (currently every ${forget_interval_hours} hours).
-    -h                Display this help message.
+    -h, --help        Display this help message.
     --install-config  Install example config files (will not overwrite existing files):
                         ${config_dir}/env
                         ${config_dir}/exclude/default.txt
@@ -88,7 +88,7 @@ OPTIONS
     -B                Abort if on battery power.
     -H                Abort if connected to an iOS hotspot.
     -I                Abort if internet is unreliable.
-    -V                Print version information.
+    -V, --version     Print version information.
 
 Restickler runs the following commands to maintain the full lifecycle of a healthy repository:
 
@@ -233,7 +233,11 @@ function _prompt() {
 }
 
 function _elapsed() {
-    printf '%dd%dh%dm%ds' $((SECONDS/86400)) $((SECONDS%86400/3600)) $((SECONDS%3600/60)) $((SECONDS%60)) | sed -E 's/(^0d(0h(0m)?)?)?//';
+    local d=$((SECONDS/86400));
+    local h=$((SECONDS%86400/3600));
+    local m=$((SECONDS%3600/60));
+    local s=$((SECONDS%60));
+    printf '%dd%dh%dm%ds' $d $h $m $s | sed -E 's/(^0d(0h(0m)?)?)?//; s/([^0-9])0h/\1/; s/([^0-9])0m/\1/; s/([^0-9])0s/\1/;';
 }
 
 function _online {
@@ -280,11 +284,12 @@ function _speedtest() {
 }
 
 function _network_quality() {
-    # Return cached internet speed test results from macOS's `networkQuality` command (only available on macOS 12+).
+    # Return cached internet speed test results
+    # The JSON is formatted to use output from macOS's `networkQuality` command (only available on macOS 12+), but that prerequisite has been removed; not speedtest is using only curl.
     local jqfilter=${1:-.};
 
     if [[ ! -s "${state_dir}/network_quality.json" && ($do_check_internet || $dl_limit == *% || $ul_limit == *%) ]]; then
-        # Replace `_speedtest` with `networkQuality -cs` to use the macOS built-in tool.
+        # Replace `_speedtest` with `networkQuality -cs` if you want to use the macOS built-in tool.
         _speedtest >| "${state_dir}/network_quality.json";
         # [[ -x $(command -v networkQuality) ]] && networkQuality -cs >| "${state_dir}/network_quality.json" || true;
         [[ -s "${state_dir}/network_quality.json" ]] && _debug "$(jq -r '"Network DL speed: \(.dl_throughput) UL speed: \(.ul_throughput) UL responsiveness: \(.ul_responsiveness)"' "${state_dir}/network_quality.json")";
@@ -661,6 +666,7 @@ while getopts "b:c:d:e:f:hnp:qu:vABHIV-:" opt ; do
             (self-update) run_self_update=1;;
             (install-config) run_install_config=1;;
             (help) _usage;;
+            (version) echo "restickler ${restickler_version} ($([[ -x $(command -v restic) ]] && restic version))"; exit 0;;
             (?) _error "Invalid option: \`${OPTARG}\`. Use option -h for help.";;
         esac ;;
         (?) _error "Invalid option: \`${opt}\`. Use option -h for help.";;
