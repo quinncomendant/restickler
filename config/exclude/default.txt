@@ -44,9 +44,12 @@ $HOME/Downloads/**/*.7z
 $HOME/Downloads/**/*.avi
 $HOME/Downloads/**/*.djvu
 $HOME/Downloads/**/*.dmg
+$HOME/Downloads/**/*.epub
+$HOME/Downloads/**/*.flac
 $HOME/Downloads/**/*.gz
 $HOME/Downloads/**/*.iso
 $HOME/Downloads/**/*.m4a
+$HOME/Downloads/**/*.m4b
 $HOME/Downloads/**/*.m4v
 $HOME/Downloads/**/*.mkv
 $HOME/Downloads/**/*.mov

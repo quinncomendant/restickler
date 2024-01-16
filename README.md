@@ -24,7 +24,7 @@ Restickler is stable as of v1.2.0. It runs impeccably on my macOS dev machine an
     curl -L -o ~/bin/restickler https://raw.githubusercontent.com/quinncomendant/restickler/master/bin/restickler
     chmod 755 ~/bin/restickler
     ```
-    
+
     (Be sure to add `~/bin` in your shell’s $PATH.)
 3. Install example config files:
 
@@ -48,7 +48,7 @@ Restickler is stable as of v1.2.0. It runs impeccably on my macOS dev machine an
     PATH=/Users/YOUR_USERNAME/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
     * * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 $HOME >/dev/null
     ```
-    
+
 (For restic to have permission to access your files on macOS you may need to give `cron` [Full Disk Access](https://send.strangecode.com/f/screen-shot-2022-04-10-at-13-25-23.png) in *System Preferences → Security & Privacy → Privacy → Full Disk Access → (click `+` and select `/usr/sbin/cron`)*)
 
 ## Update
@@ -76,7 +76,7 @@ OPTIONS
     -d MBPS|%         Limit download speed in Mb/s or as a percentage of available bandwidth.
     -e FILE           File containing back up exclusion rules, used as --exclude-file=FILE.
     -f HOURS          Min interval between forget operations (currently every 24 hours).
-    -h                Display this help message.
+    -h, --help        Display this help message.
     --install-config  Install example config files (will not overwrite existing files):
                         ~/.config/restickler/env
                         ~/.config/restickler/exclude/default.txt
@@ -90,7 +90,7 @@ OPTIONS
     -B                Abort if on battery power.
     -H                Abort if connected to an iOS hotspot.
     -I                Abort if internet is unreliable.
-    -V                Print version information.
+    -V, --version     Print version information.
 
 Restickler runs the following commands to maintain the full lifecycle of a healthy repository:
 
@@ -168,6 +168,7 @@ Fix this by running `source ~/.config/restickler/env && restic unlock` after con
 - Improve configuration of logging level. Currently using -v[-v[-v]] to include more in logs, but would be nice to have a dedicated --log-level option.
 - Set I/O and CPU priority (`taskpolicy -c utility` to use only efficiency cores, `taskpolicy -b throttle` to limit I/O).
 - Choose a default tag to use with `--keep-tag` for persistent snapshots.
+- Improve stale locks detection. Currently, handling stale locks requires manual intervention.
 
 ## License
 
