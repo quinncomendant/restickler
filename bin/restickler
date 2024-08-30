@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.2.4';
+restickler_version='1.2.5';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -437,6 +437,10 @@ function _restic_backup() {
     local limit_download limit_upload;
     limit_download=$(_convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
     limit_upload=$(_convert_limit "$ul_limit" ".ul_throughput" "--limit-upload");
+    # shellcheck disable=SC2086
+    [[ -n $dryrun ]] && $dryrunexec $caffeinate restic $quiet $verbose $limit_download $limit_upload backup "$@" \
+        $exclude_file \
+        $dryrun;
     # shellcheck disable=SC2086
     $caffeinate restic $quiet $verbose $limit_download $limit_upload backup "$@" \
         $exclude_file \
