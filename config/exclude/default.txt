@@ -3,19 +3,20 @@
 # https://restic.readthedocs.io/en/latest/040_backup.html#excluding-files
 
 # Most of ~/Library should *not* be backed up (lots of caches, cloud-synced data), so exclude subdirectories…
-$HOME/Library/**/*
-$HOME/Library/Containers/com.docker.docker
-$HOME/Library/Containers/Docker
-$HOME/Library/Application Support/MobileSync
-$HOME/Library/Application Support/**/File System
+$HOME/Library/*
 
-# Then selectively include the directories you want to back up by prefixing them with `!`:
+# Then selectively reverse the exclusion for directories you want to back up by prefixing them with `!`:
 !$HOME/Library/Application Support
-!$HOME/Library/Keychains/*.keychain-db
 !$HOME/Library/Mail
 !$HOME/Library/Scripts
 !$HOME/Library/Services
 # etc…
+
+# A subdirectory will not be included if its parent directory is excluded. To include a subdirectory,
+# include all its ancestors, specifying additional exclusions at each level as needed.
+!$HOME/Library/Keychains
+$HOME/Library/Keychains/*
+!$HOME/Library/Keychains/*.keychain-db
 
 # The Apple Photos database file (Photos.sqlite) changes frequently, resulting in about 1 GB of new data every back up.
 # Do it separately, perhaps weekly, using  `-e $HOME/etc/restickler/exclude/photoslibrary.txt`.
@@ -25,6 +26,7 @@ $HOME/**/fish/fish_history*
 $HOME/.bash_history*
 $HOME/.bash_sessions
 $HOME/.cache
+$HOME/.cargo
 $HOME/.composer
 $HOME/.cpan
 $HOME/.docker
