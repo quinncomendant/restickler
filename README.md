@@ -108,6 +108,8 @@ GETTING STARTED
     4. Initialize the repo: `source ~/.config/restickler/env && restic -r gs:YOUR_BUCKET_NAME:/ init`
     5. Do back up with `restickler $HOME`
 
+If defined, Restickler will use `$XDG_CONFIG_HOME` instead of `~/.config`, and `$XDG_STATE_HOME` instead of `~/.local`.
+
 For detailed set-up instructions, see https://github.com/quinncomendant/restickler#set-up
 
 ENVIRONMENT VARIABLES
