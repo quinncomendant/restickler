@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.2.6';
+restickler_version='1.3.0';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -30,6 +30,8 @@ mkdir -p "${config_dir}/exclude" "$state_dir" "${tmp_dir}/restickler/restore";
 touch "$log_file";
 
 # Default configuration options.
+tasks_default=(backup restore forget prune check);
+tasks=();
 dl_limit='';
 ul_limit='';
 exclude_file="${config_dir}/exclude/default.txt";
@@ -79,6 +81,7 @@ OPTIONS
     -n                Dry run: print the expected outcome to the screen; don’t actually do anything.
     -p HOURS          Min interval between prune operations (currently every ${prune_interval_hours} hours).
     -q                Do not output comprehensive progress report.
+    -t TASK,TASK,…   A list of tasks to complete on SOURCE (default: backup,restore,forget,prune,check)
     --self-update     Download the replace restickler with the latest release from GitHub.
     -u MBPS|%         Limit upload speed in Mb/s or as a percentage of available bandwidth.
     -v                Display verbose output (-vv to list uploaded files; -vvv to show debugging output).
@@ -229,6 +232,14 @@ function _prompt() {
         (*) false;;
     esac
 }
+
+function _todo() {
+    local needle=$1;
+    for t in "${tasks[@]}"; do
+        [[ $t == "$needle" ]] && return 0;
+    done;
+    return 1;
+};
 
 function _elapsed() {
     local d=$((SECONDS/86400));
@@ -661,7 +672,7 @@ caffeinate=''; # caffeinate is only available on macOS.
 type -P caffeinate >/dev/null && caffeinate='caffeinate -i' || true;
 
 # Process command line options.
-while getopts "b:c:d:e:f:hnp:qu:vABHIV-:" opt ; do
+while getopts "b:c:d:e:f:hnp:qt:u:vABHIV-:" opt ; do
     case $opt in
         (b) backup_interval_hours=${OPTARG%.*};; # Args with hours need to be integers.
         (c) check_interval_hours=${OPTARG%.*};;
@@ -672,6 +683,7 @@ while getopts "b:c:d:e:f:hnp:qu:vABHIV-:" opt ; do
         (n) dryrun='--dry-run'; dryrunexec='echo DRY-RUN:';;
         (p) prune_interval_hours=${OPTARG%.*};;
         (q) quiet="--quiet";;
+        (t) IFS=',' read -ra tasks <<< "$OPTARG";;
         (u) ul_limit=$OPTARG;;
         (v) verbose="-v ${verbose}";;
         (A) do_check_idle=1;;
@@ -703,6 +715,15 @@ fi
 [[ $check_interval_hours =~ ^[0-9]+$ ]]  || _error "Check interval must be an integer (e.g., \`-c 168\`).";
 [[ $forget_interval_hours =~ ^[0-9]+$ ]] || _error "Forget interval must be an integer (e.g., \`-f 24\`).";
 [[ $prune_interval_hours =~ ^[0-9]+$ ]]  || _error "Prune interval must be an integer (e.g., \`-p 240\`).";
+
+[[ ${#tasks[@]} -eq 0 ]] && tasks=("${tasks_default[@]}");
+for t in "${tasks[@]}"; do
+    invalid_task=1;
+    for td in "${tasks_default[@]}"; do
+        [[ "$t" == "$td" ]] && { invalid_task=0; break; };
+    done;
+    [[ $invalid_task -eq 0 ]] || _error "Invalid task: $t";
+done;
 
 # Additional arguments are backup sources. Verify them.
 for src in "$@"; do
@@ -764,22 +785,22 @@ fi
 
 _info "Starting restickler $* to ${RESTIC_REPOSITORY}";
 
-tasks=();
-_restic_backup "${@%/}" && tasks+=('back up') && _restic_test_restore "${@%/}" && tasks+=('test restore');
-_restic_forget && tasks+=('forget');
-_restic_prune && tasks+=('prune');
-_restic_check && tasks+=('check');
+completed_tasks=();
+_todo backup && _restic_backup "${@%/}" && completed_tasks+=('back up') && _todo restore && _restic_test_restore "${@%/}" && completed_tasks+=('test restore');
+_todo forget && _restic_forget && completed_tasks+=('forget');
+_todo prune && _restic_prune && completed_tasks+=('prune');
+_todo check && _restic_check && completed_tasks+=('check');
 
 # Format a string of tasks that completed successfully.
-case ${#tasks[@]} in
-    (0) tasks_list='0 tasks';;
-    (1) tasks_list="1 task: ${tasks[*]}";;
-    (*) tasks_list="${#tasks[@]} tasks: $(printf '%s, ' "${tasks[@]}")";;
+case ${#completed_tasks[@]} in
+    (0) completed_tasks_list='0 tasks';;
+    (1) completed_tasks_list="1 task: ${completed_tasks[*]}";;
+    (*) completed_tasks_list="${#completed_tasks[@]} tasks: $(printf '%s, ' "${completed_tasks[@]}")";;
 esac
-_info "Finished ${tasks_list%, } ($(_elapsed) elapsed)";
+_info "Finished ${completed_tasks_list%, } ($(_elapsed) elapsed)";
 
 # Send “success” signal to HealthChecks.io when run via cron, but only if a /start ping was sent (which only occurs when a main action begins, i.e., back up, forget, prune, or check).
 # shellcheck disable=SC2015
 if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -n $sent_healthchecks_start ]]; then
-    curl -fsS -A "$(hostname -s)" -X POST --data-binary "Finished ${tasks_list%, } on $* ($(_elapsed) elapsed)" --retry 3 "$HEALTHCHECKS_URL" >/dev/null || true;
+    curl -fsS -A "$(hostname -s)" -X POST --data-binary "Finished ${completed_tasks_list%, } on $* ($(_elapsed) elapsed)" --retry 3 "$HEALTHCHECKS_URL" >/dev/null || true;
 fi
