@@ -61,13 +61,6 @@ Get the latest version of `restickler` and `restic` by running their self-update
 Run `restickler -h` to print this usage message:
 
 ```
-restickler 1.3.0
-
-A wrapper for restic (https://restic.net/) that supervises back up, forget, prune, check,
-and restore test. Designed for macOS, but works on Linux too.
-https://github.com/quinncomendant/restickler
-Quinn Comendant <quinn@strangecode.com>
-
 USAGE
 
     restickler [OPTIONS] SOURCE [SOURCE…]
@@ -80,10 +73,10 @@ OPTIONS
     -B                Abort if on battery power.
     -b HOURS          Min interval between back up operations (currently every 0 hours).
     -C FILE           Path to environment config file (default: ~/.config/restickler/env).
-    -c HOURS          Min interval between check operations (currently every 168 hours).
+    -c HOURS          Min interval between check operations (currently every 720 hours).
     -d MBPS|%         Limit download speed in Mb/s or as a percentage of available bandwidth.
     -e FILE           File containing back up exclusion rules, used as --exclude-file=FILE.
-    -f HOURS          Min interval between forget operations (currently every 24 hours).
+    -f HOURS          Min interval between forget operations (currently every 168 hours).
     -H                Abort if connected to an iOS hotspot.
     -h, --help        Display this help message.
     -I                Abort if internet is unreliable.
@@ -102,10 +95,10 @@ OPTIONS
 Restickler, by default, runs these commands in sequence to maintain the full lifecycle of a healthy repository:
 
     1. `restic backup` (every 0 hours or as specified by -b)
-    2. `restic restore` (restore test file from SOURCE1/.restickler-canary/UTC_DATE_TIME)
-    3. `restic forget` (every 24 hours or as specified by -f)
+    2. `restic restore` (restore test file from SOURCE/.restickler-canary/UTC_DATE_TIME)
+    3. `restic forget` (every 168 hours or as specified by -f)
     4. `restic prune` (every 240 hours or as specified by -p)
-    5. `restic check` (every 168 hours or as specified by -c)
+    5. `restic check` (every 720 hours or as specified by -c)
 
 Use `-t` to limit which tasks are run, e.g., `-t backup,restore,forget` to run only the first three tasks.
 
@@ -114,7 +107,7 @@ GETTING STARTED
     1. Install example config files: `restickler --install-config`
     2. Configure environment in `~/.config/restickler/env` (see ENVIRONMENT VARIABLES below)
     3. Configure excluded paths in `~/.config/restickler/exclude/default.txt`
-    4. Initialize the repo: `source ~/.config/restickler/env && restic -r gs:YOUR_BUCKET_NAME:/ init`
+    4. Initialize the repo: `source ~/.config/restickler/env && restic init`
     5. Do back up with `restickler $HOME`
 
 For detailed set-up instructions, see https://github.com/quinncomendant/restickler#set-up
