@@ -270,7 +270,7 @@ function _speedtest() {
     dl_url=$(jq -r '.urls.large_https_download_url' <<<"$config" 2>/dev/null || true);
     ul_url=$(jq -r '.urls.https_upload_url' <<<"$config" 2>/dev/null || true);
 
-    if [[ -z $dl_url || -z $ul_url ]]; then
+    if [[ -z $dl_url || -z $ul_url || $dl_url == "null" || $ul_url == "null" ]]; then
         _error "Failed to get speed test config.";
     fi
 
@@ -288,8 +288,10 @@ function _speedtest() {
     # shellcheck disable=SC2015
     ul_bps=$(jq -e . <<<"$ul_raw" &>/dev/null && jq 'reduce inputs.BPS as $n (.; .BPS += ($n * 8)) | .BPS' <<<"$ul_raw" || true);
 
-    # Log how much data speedtest uses.
-    printf "%s\t${dl_bps:-0}\t${ul_bps:-0}\t$((megabytes*1024*1024))\t$((megabytes*1024*1024))\n" "$(date '+%F %T')" >> ~/var/speedtest.log
+    # Log how much data speedtest uses, only if the speedtest.log file exists. This is an undocumented feature.
+    if [[ -f "${state_dir}/speedtest.log" ]]; then
+        printf "%s\t${dl_bps:-0}\t${ul_bps:-0}\t$((megabytes*1024*1024))\t$((megabytes*1024*1024))\n" "$(date '+%F %T')" >> "${state_dir}/speedtest.log" 2>/dev/null || true;
+    fi
 
     # Save a json with the keys we use in the same format used by the networkQuality command.
     # Throughput values are in bits/second.
@@ -371,7 +373,7 @@ function _connected_to_hotspot() {
 
 function _running_restic_processes() {
     # shellcheck disable=SC2009
-    ps -Ao command | grep '^[/a-z]*restic ' || true;
+    ps -Ao command 2>/dev/null | grep '^[/a-z]*restic ' || true;
 }
 
 function _repository_is_locked() {
@@ -381,7 +383,7 @@ function _repository_is_locked() {
         if [[ -n $restic_process ]]; then
             _warning "Skipping ${command} because repository is locked (possibly by “${restic_process}”)";
         else
-            _warning "Skipping ${command} because repository is locked (run \`source $config_file && restic unlock\` after confirming no restic processes are running)";
+            _warning "Skipping ${command} because repository is locked (run \`source \"$config_file\" && restic unlock\` after confirming no restic processes are running)";
         fi
         return 0;
     fi
