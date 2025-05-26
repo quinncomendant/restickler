@@ -373,7 +373,7 @@ function _connected_to_hotspot() {
 
 function _running_restic_processes() {
     # shellcheck disable=SC2009
-    ps -Ao command 2>/dev/null | grep '^[/a-z]*restic ' || true;
+    ps -Ao command 2>/dev/null | grep '^[/a-z]*restic ' | awk 'NF{printf "%s“%s”",sep,$0;sep=", "} END{printf ORS}' 2>/dev/null || true;
 }
 
 function _repository_is_locked() {
@@ -381,7 +381,7 @@ function _repository_is_locked() {
     if [[ -n "$(restic -q --no-lock list locks)" ]]; then
         restic_process=$(_running_restic_processes);
         if [[ -n $restic_process ]]; then
-            _warning "Skipping ${command} because repository is locked (possibly by “${restic_process}”)";
+            _warning "Skipping ${command} because repository is locked (possibly by ${restic_process})";
         else
             _warning "Skipping ${command} because repository is locked (run \`source \"$config_file\" && restic unlock\` after confirming no restic processes are running)";
         fi
@@ -671,7 +671,7 @@ for requiredcmd in restic curl jq bc tr awk sed readlink curl; do
     type -P "$requiredcmd" >/dev/null || _error "The '$requiredcmd' command is not available";
 done
 
-restic_min_version='0.13.0';
+restic_min_version='0.14.0';
 restic_installed_version=$(restic version | awk '{print $2}');
 if [[ "$restic_min_version" != "$(echo -e "${restic_installed_version}\n${restic_min_version}" | sort -V | head -1)" ]]; then
     _error "This script requires restic >= $restic_min_version (installed version is ${restic_installed_version}). Upgrade with: \`$(readlink -f "$(which restic)") self-update\`.";
@@ -748,7 +748,7 @@ done
 # Enforce single-instance execution (via mkdir, which creates atomic lock and check at once).
 # A design goal of restickler is to complete its tasks as quickly as possible. As such, we want to avoid resource contention.
 mkdir "${tmp_dir}/restickler/lock" 2>/dev/null || {
-    _info "Another restickler process is running (lock exists; restic process: “$(_running_restic_processes)”).";
+    _info "Another restickler process is running (lock exists; restic process: $(_running_restic_processes)).";
     exit 1;
 };
 
