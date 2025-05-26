@@ -1,26 +1,46 @@
-# See all understood env vars at https://restic.readthedocs.io/en/stable/040_backup.html#environment-variables
+# See all of Restic's env vars at https://restic.readthedocs.io/en/stable/040_backup.html#environment-variables
 
-# Repository password saved in the macOS KeyChain.
+# On macOS: repository password is saved in the System Keychain.
 # To use restic from the terminal and cron, you have to add the password to both login and System keychains:
-# 1. Add the password to the login keychain: `security add-generic-password -s restic-repository-pw -a restic -w`
+# 1. Add the password to the login keychain: `security add-generic-password -s restic-repo-pw -a restic -w`
 # 2. Copy it from the login keychain to the System keychain (right-click copy in login → right-click paste in System).
-export RESTIC_PASSWORD_COMMAND='security find-generic-password -a restic -s restic-repository-pw -w';
-
-# On Linux you save your password to `~/.config/restickler/restic-repository-pw` (`chmod 600 …`) and
-# set RESTIC_PASSWORD_COMMAND to 'cat ~/.config/restickler/restic-repository-pw'.
+#
+# On Linux you save your password to `~/.config/restickler/restic-repo-pw` (`chmod 600 …`) and
+# set RESTIC_PASSWORD_COMMAND to 'cat ~/.config/restickler/restic-repo-pw'.
 # You may also use the RESTIC_PASSWORD variable, but this is less secure, because exported variables
 # containing credentials may be revealed accidentally.
-
-# GCP Service Account credentials.
-# https://console.cloud.google.com/iam-admin/serviceaccounts
-export GOOGLE_PROJECT_ID='YOUR_PROJECT_ID';
-# Set minimum permissions on this file (`chmod 640 …`).
-export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/restickler/YOUR_SERVICE_ACCOUNT_KEY_FILE.json";
+export RESTIC_PASSWORD_COMMAND='security find-generic-password -a restic -s restic-repo-pw -w';
 
 # The repository to backup to and restore from.
-# If using Google Cloud Storage, the value looks like `gs:YOUR_BUCKET_NAME:/`.
-# https://console.cloud.google.com/storage/browser
+# If using GCP object storage: `gs:YOUR_BUCKET_NAME:/`.
+# If using S3-compatible object storage: `s3:https://s3.example.com/YOUR_BUCKET_NAME`.
 export RESTIC_REPOSITORY='';
+
+# Restic backup configuration parameters.
+# https://restic.readthedocs.io/en/stable/047_tuning_backup_parameters.html
+export RESTIC_COMPRESSION='auto';
 
 # The URL to ping for backup success or failure at Healthchecks.io (optional).
 export HEALTHCHECKS_URL='';
+
+# GCP object storage – Service Account credentials.
+# https://console.cloud.google.com/iam-admin/serviceaccounts
+#export GOOGLE_PROJECT_ID='…';
+#export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/restickler/YOUR_SERVICE_ACCOUNT_KEY_FILE.json"; # Set minimum permissions on this file (`chmod 600 …`).
+
+# S3-compatible object storage service.
+#export AWS_ACCESS_KEY_ID='…';
+#export AWS_SECRET_ACCESS_KEY='…';
+
+# Function to unset the above variables for the current session.
+function deactivate_restic_env() {
+    unset RESTIC_PASSWORD_COMMAND \
+    RESTIC_REPOSITORY \
+    RESTIC_COMPRESSION \
+    GOMAXPROCS \
+    HEALTHCHECKS_URL \
+    GOOGLE_PROJECT_ID \
+    GOOGLE_APPLICATION_CREDENTIALS \
+    AWS_ACCESS_KEY_ID \
+    AWS_SECRET_ACCESS_KEY;
+}

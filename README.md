@@ -2,13 +2,11 @@
 
 A wrapper for [restic](https://restic.net/) that supervises back up, forget, prune, check, and restore test. Designed for macOS, but works on Linux too.
 
-![restickler logo](https://send.strangecode.com/f/restickler-hero.jpg)
-
 Restickler is stable as of v1.2.0. It runs impeccably on my macOS dev machine and Linux servers, but since your environment might be different, please use at your own risk. If you notice a glitch, please create an [issue](https://github.com/quinncomendant/restickler/issues).
 
 ## Features
 
-- Run back up and maintenance functions (forget, prune, and check) on a minimal interval schedule. E.g., schedule back up to every 3 hours with `-b 3`, and prune every 3 days with `-p 72`.
+- Run back up, test restore, and maintenance tasks on a minimal interval schedule. Specify tasks with `-t` (default: `backup,restore,forget,prune,check`). E.g., to schedule back up every 3 hours, and prune every 3 days, use: `-t backup,prune -b 3 -p 72`.
 - Skip if there has been no user activity since last back up (`-A`), if on battery power (`-B`), if tethered to an iOS hotspot (`-H`), or if internet is unreliable (`-I`) (macOS only).
 - Limit upload and download speed as a percentage of available bandwidth, e.g., `-u 50% -d 50%`.
 - Test restoring a unique “canary” file after every back up. This verifies that back up and restore are working.
@@ -36,10 +34,10 @@ Restickler is stable as of v1.2.0. It runs impeccably on my macOS dev machine an
 
 ## Set up
 
-1. [Prepare your back up repository](https://restic.readthedocs.io/en/latest/030_preparing_a_new_repo.html) (GCP’s [Coldline Storage](https://cloud.google.com/storage/docs/storage-classes#coldline) is a great choice)
+1. [Prepare your back up repository](https://restic.readthedocs.io/en/latest/030_preparing_a_new_repo.html) (GCP’s [Coldline Storage](https://cloud.google.com/storage/docs/storage-classes#coldline) is an easy option)
 2. Configure credentials and repository in `~/.config/restickler/env`
 3. Configure [exclude paths](https://restic.readthedocs.io/en/latest/040_backup.html#excluding-files) in `~/.config/restickler/exclude/default.txt`
-4. Initialize the backup destination, e.g., if using GCP Storage: `source ~/.config/restickler/env && restic -r gs:YOUR_BUCKET_NAME:/ init`
+4. Initialize the backup destination: `source ~/.config/restickler/env && restic init`
 5. Test your configuration with a dry-run: `restickler -vn $HOME`
 6. Back up your home directory: `restickler -v $HOME`
 7. Automatically back up hourly by adding this to `crontab -e` (all features enabled for macOS):
@@ -63,6 +61,13 @@ Get the latest version of `restickler` and `restic` by running their self-update
 Run `restickler -h` to print this usage message:
 
 ```
+restickler 1.3.0
+
+A wrapper for restic (https://restic.net/) that supervises back up, forget, prune, check,
+and restore test. Designed for macOS, but works on Linux too.
+https://github.com/quinncomendant/restickler
+Quinn Comendant <quinn@strangecode.com>
+
 USAGE
 
     restickler [OPTIONS] SOURCE [SOURCE…]
@@ -71,12 +76,17 @@ Back up SOURCE and run maintenance tasks on the configured restic repository.
 
 OPTIONS
 
+    -A                Abort if there has been no user activity since last back up.
+    -B                Abort if on battery power.
     -b HOURS          Min interval between back up operations (currently every 0 hours).
+    -C FILE           Path to environment config file (default: ~/.config/restickler/env).
     -c HOURS          Min interval between check operations (currently every 168 hours).
     -d MBPS|%         Limit download speed in Mb/s or as a percentage of available bandwidth.
     -e FILE           File containing back up exclusion rules, used as --exclude-file=FILE.
     -f HOURS          Min interval between forget operations (currently every 24 hours).
+    -H                Abort if connected to an iOS hotspot.
     -h, --help        Display this help message.
+    -I                Abort if internet is unreliable.
     --install-config  Install example config files (will not overwrite existing files):
                         ~/.config/restickler/env
                         ~/.config/restickler/exclude/default.txt
@@ -84,21 +94,20 @@ OPTIONS
     -p HOURS          Min interval between prune operations (currently every 240 hours).
     -q                Do not output comprehensive progress report.
     --self-update     Download the replace restickler with the latest release from GitHub.
+    -t TASK,TASK,…   A list of tasks to complete on SOURCE (default: backup,restore,forget,prune,check)
     -u MBPS|%         Limit upload speed in Mb/s or as a percentage of available bandwidth.
     -v                Display verbose output (-vv to list uploaded files; -vvv to show debugging output).
-    -A                Abort if there has been no user activity since last back up.
-    -B                Abort if on battery power.
-    -H                Abort if connected to an iOS hotspot.
-    -I                Abort if internet is unreliable.
     -V, --version     Print version information.
 
-Restickler runs the following commands to maintain the full lifecycle of a healthy repository:
+Restickler, by default, runs these commands in sequence to maintain the full lifecycle of a healthy repository:
 
     1. `restic backup` (every 0 hours or as specified by -b)
     2. `restic restore` (restore test file from SOURCE1/.restickler-canary/UTC_DATE_TIME)
     3. `restic forget` (every 24 hours or as specified by -f)
     4. `restic prune` (every 240 hours or as specified by -p)
     5. `restic check` (every 168 hours or as specified by -c)
+
+Use `-t` to limit which tasks are run, e.g., `-t backup,restore,forget` to run only the first three tasks.
 
 GETTING STARTED
 
@@ -108,14 +117,12 @@ GETTING STARTED
     4. Initialize the repo: `source ~/.config/restickler/env && restic -r gs:YOUR_BUCKET_NAME:/ init`
     5. Do back up with `restickler $HOME`
 
-If defined, Restickler will use `$XDG_CONFIG_HOME` instead of `~/.config`, and `$XDG_STATE_HOME` instead of `~/.local`.
-
 For detailed set-up instructions, see https://github.com/quinncomendant/restickler#set-up
 
 ENVIRONMENT VARIABLES
 
 The following environment variables can be defined in `~/.config/restickler/env`, which is
-automatically included by restickler if it exists:
+automatically sourced by restickler if it exists. Use `-C FILE` to specify a custom env file.
 
     RESTIC_REPOSITORY               The restic repository to back up to and maintain.
     RESTIC_PASSWORD_COMMAND         The shell command that outputs the repository password.
@@ -124,7 +131,7 @@ automatically included by restickler if it exists:
     GOOGLE_PROJECT_ID               GCP project ID.
     HEALTHCHECKS_URL                Healthchecks.io URL to ping on success or failure (optional).
 
-The GOOGLE_* variables can be replaced by the cloud-provider of your choice;
+The GOOGLE_* variables can be replaced with variables used by your preferred cloud provider;
 see https://restic.readthedocs.io/en/latest/030_preparing_a_new_repo.html
 
 LOGS
@@ -137,9 +144,9 @@ Back up the entire home directory, except files matched by `~/.config/restickler
 
     restickler $HOME
 
-Back up all Apple Photo libraries, with a custom exclude file:
+Back up all Apple Photo libraries, doing back up only, with a custom exclude file:
 
-    restickler -e ~/.config/restickler/exclude/photoslibrary.txt $HOME/Pictures/*.photoslibrary
+    restickler -t backup -e ~/.config/restickler/exclude/photoslibrary.txt $HOME/Pictures/*.photoslibrary
 
 Force back up, forget, prune, and check to run by setting intervals to 0 (removing
 the `~/.local/state/restickler/last-*-time*` files would also reset the interval timer):
