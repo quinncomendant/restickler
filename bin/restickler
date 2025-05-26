@@ -266,7 +266,9 @@ function _online {
 function _speedtest() {
     local megabytes=2 concurrency=8 dl_bytes ul_bytes config dl_url ul_url dl_raw dl_bps ul_raw ul_bps;
 
-    config=$(curl -s https://mensura.cdn-apple.com/api/v1/gm/config 2>/dev/null || true);
+    curl --tlsv1.3 -sfZ --parallel-immediate --version &>/dev/null || _error 'The installed version of curl does not support --tlsv1.3 or -Z, required for restickler’s speedtest features.';
+
+    config=$(curl --tlsv1.3 -s https://mensura.cdn-apple.com/api/v1/gm/config 2>/dev/null || true);
     dl_url=$(jq -r '.urls.large_https_download_url' <<<"$config" 2>/dev/null || true);
     ul_url=$(jq -r '.urls.https_upload_url' <<<"$config" 2>/dev/null || true);
 
@@ -279,12 +281,12 @@ function _speedtest() {
 
     # Download test in parallel; sum download speeds excluding connection time.
     # shellcheck disable=SC2046
-    dl_raw=$(curl -sfZ --connect-timeout 3 --parallel-immediate -H "Range: bytes=0-${dl_bytes}" -w "(%{size_download} / (%{time_total} - %{time_starttransfer})) +" $(for ((i=1; i<=concurrency; i++)); do echo -n "${dl_url} -o /dev/null "; done) 2>/dev/null || true);
+    dl_raw=$(curl --tlsv1.3 -sfZ --connect-timeout 3 --parallel-immediate -H "Range: bytes=0-${dl_bytes}" -w "(%{size_download} / (%{time_total} - %{time_starttransfer})) +" $(for ((i=1; i<=concurrency; i++)); do echo -n "${dl_url} -o /dev/null "; done) 2>/dev/null || true);
     dl_bps=$(bc <<<"scale=0; (${dl_raw} 0) * 8");
 
     # Upload random data in parallel; the /slurp endpoint returns json with a BPS value that we sum for the total bytes/second that are transfered during this test.
     # shellcheck disable=SC2046
-    ul_raw=$(head -c "$ul_bytes" /dev/random | curl -sfZ --connect-timeout 3 --parallel-immediate --data-binary '@-' $(for ((i=1; i<=concurrency; i++)); do echo -n "${ul_url} "; done) 2>/dev/null || true);
+    ul_raw=$(head -c "$ul_bytes" /dev/random | curl --tlsv1.3 -sfZ --connect-timeout 3 --parallel-immediate --data-binary '@-' $(for ((i=1; i<=concurrency; i++)); do echo -n "${ul_url} "; done) 2>/dev/null || true);
     # shellcheck disable=SC2015
     ul_bps=$(jq -e . <<<"$ul_raw" &>/dev/null && jq 'reduce inputs.BPS as $n (.; .BPS += ($n * 8)) | .BPS' <<<"$ul_raw" || true);
 
@@ -371,9 +373,10 @@ function _connected_to_hotspot() {
     return "${PIPESTATUS[${#PIPESTATUS[@]}-1]}";
 }
 
+# Detect if any RESTIC processes are running on this computer. If no processes are running, returns an empty string. If any processes end with the word RESTIC. Return the command names enclosed in quotes and comma separated.
 function _running_restic_processes() {
     # shellcheck disable=SC2009
-    ps -Ao command 2>/dev/null | grep '^[/a-z]*restic ' | awk 'NF{printf "%s“%s”",sep,$0;sep=", "} END{printf ORS}' 2>/dev/null || true;
+    ps -Ao command 2>/dev/null | grep '^[/a-z]*restic ' | awk 'NF{printf "%s“%s”", sep, $0; sep=", "}' 2>/dev/null || true;
 }
 
 function _repository_is_locked() {
