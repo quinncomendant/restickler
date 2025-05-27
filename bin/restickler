@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.3.0';
+restickler_version='1.3.1';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -49,6 +49,7 @@ forget_interval_hours=168; # 7 days
 prune_interval_hours=240;  # 10 days
 check_interval_hours=720;  # 30 days
 sent_healthchecks_start='';
+allow_auto_unlock='';
 
 #
 # Functions
@@ -70,28 +71,29 @@ Back up SOURCE and run maintenance tasks on the configured restic repository.
 
 OPTIONS
 
-    -A                Abort if there has been no user activity since last back up.
-    -B                Abort if on battery power.
-    -b HOURS          Min interval between back up operations (currently every ${backup_interval_hours} hours).
-    -C FILE           Path to environment config file (default: ${config_dir}/env).
-    -c HOURS          Min interval between check operations (currently every ${check_interval_hours} hours).
-    -d MBPS|%         Limit download speed in Mb/s or as a percentage of available bandwidth.
-    -e FILE           File containing back up exclusion rules, used as --exclude-file=FILE.
-    -f HOURS          Min interval between forget operations (currently every ${forget_interval_hours} hours).
-    -H                Abort if connected to an iOS hotspot.
-    -h, --help        Display this help message.
-    -I                Abort if internet is unreliable.
-    --install-config  Install example config files (will not overwrite existing files):
-                        $config_file
-                        ${config_dir}/exclude/default.txt
-    -n                Dry run: print the expected outcome to the screen; don’t actually do anything.
-    -p HOURS          Min interval between prune operations (currently every ${prune_interval_hours} hours).
-    -q                Do not output comprehensive progress report.
-    --self-update     Download the replace restickler with the latest release from GitHub.
-    -t TASK,TASK,…   A list of tasks to complete on SOURCE (default: backup,restore,forget,prune,check)
-    -u MBPS|%         Limit upload speed in Mb/s or as a percentage of available bandwidth.
-    -v                Display verbose output (-vv to list uploaded files; -vvv to show debugging output).
-    -V, --version     Print version information.
+    -A                  Abort if there has been no user activity since last back up.
+    -B                  Abort if on battery power.
+    -b HOURS            Min interval between back up operations (currently every ${backup_interval_hours} hours).
+    -C FILE             Path to environment config file (default: ${config_dir}/env).
+    -c HOURS            Min interval between check operations (currently every ${check_interval_hours} hours).
+    -d MBPS|%           Limit download speed in Mb/s or as a percentage of available bandwidth.
+    -e FILE             File containing back up exclusion rules, used as --exclude-file=FILE.
+    -f HOURS            Min interval between forget operations (currently every ${forget_interval_hours} hours).
+    -H                  Abort if connected to an iOS hotspot.
+    -h, --help          Display this help message.
+    -I                  Abort if internet is unreliable.
+    --allow-auto-unlock Automatically unlock stale repository locks (older than 24h, same host+user, restic not running).
+    --install-config    Install example config files (will not overwrite existing files):
+                          $config_file
+                          ${config_dir}/exclude/default.txt
+    -n                  Dry run: print the expected outcome to the screen; don’t actually do anything.
+    -p HOURS            Min interval between prune operations (currently every ${prune_interval_hours} hours).
+    -q                  Do not output comprehensive progress report.
+    --self-update       Download the replace restickler with the latest release from GitHub.
+    -t TASK,TASK,…     A list of tasks to complete on SOURCE (default: backup,restore,forget,prune,check)
+    -u MBPS|%           Limit upload speed in Mb/s or as a percentage of available bandwidth.
+    -v                  Display verbose output (-vv to list uploaded files; -vvv to show debugging output).
+    -V, --version       Print version information.
 
 Restickler, by default, runs these commands in sequence to maintain the full lifecycle of a healthy repository:
 
@@ -266,7 +268,7 @@ function _online {
 function _speedtest() {
     local megabytes=2 concurrency=8 dl_bytes ul_bytes config dl_url ul_url dl_raw dl_bps ul_raw ul_bps;
 
-    curl --tlsv1.3 -sfZ --parallel-immediate --version &>/dev/null || _error 'The installed version of curl does not support --tlsv1.3 or -Z, required for restickler’s speedtest features.';
+    curl --tlsv1.3 -sfZ --parallel-immediate --version &>/dev/null || _error "The installed version of curl does not support --tlsv1.3 or -Z, required for restickler’s speedtest features.";
 
     config=$(curl --tlsv1.3 -s https://mensura.cdn-apple.com/api/v1/gm/config 2>/dev/null || true);
     dl_url=$(jq -r '.urls.large_https_download_url' <<<"$config" 2>/dev/null || true);
@@ -380,17 +382,57 @@ function _running_restic_processes() {
 }
 
 function _repository_is_locked() {
-    local command=$1 restic_process;
-    if [[ -n "$(restic -q --no-lock list locks)" ]]; then
-        restic_process=$(_running_restic_processes);
-        if [[ -n $restic_process ]]; then
-            _warning "Skipping ${command} because repository is locked (possibly by ${restic_process})";
-        else
-            _warning "Skipping ${command} because repository is locked (run \`source \"$config_file\" && restic unlock\` after confirming no restic processes are running)";
-        fi
+    local command=$1 lock_ids restic_process;
+
+    lock_ids=$(restic -q --no-lock list locks 2>/dev/null || true);
+    if [[ -z "$lock_ids" ]]; then
+        return 1; # Not locked
+    fi
+
+    # Check if restic process is currently running on local computer.
+    restic_process=$(_running_restic_processes);
+    if [[ -n $restic_process ]]; then
+        _warning "Skipping ${command} because repository is locked (restic process: ${restic_process})";
+        return 0; # Locked, not stale.
+    fi
+
+    # If auto-unlock is not enabled, log a warning with instructions to manually unlock the repo.
+    if [[ -z $allow_auto_unlock ]]; then
+        _warning "Skipping ${command} because repository is locked (run \`source \"$config_file\" && restic unlock\` after confirming no restic processes are running)";
         return 0;
     fi
-    return 1;
+
+    local lock_id lock_json lock_time lock_hostname lock_username lock_age_seconds;
+    while IFS= read -r lock_id; do
+        [[ -n "$lock_id" ]] || continue;
+        lock_json=$(restic --json -q --no-lock cat lock "$lock_id" 2>/dev/null || echo '{}');
+        lock_time=$(jq -r '.time // empty' <<<"$lock_json" 2>/dev/null || true);
+        lock_time=${lock_time%%.*};
+        lock_time=${lock_time/T/ };
+        lock_age_seconds=$(( $(date +%s) - $(date -d "$lock_time" +%s 2>/dev/null || date -j -f "%Y-%m-%d %H:%M:%S" "$lock_time" +%s 2>/dev/null || echo 0) ));
+        lock_hostname=$(jq -r '.hostname // empty' <<<"$lock_json" 2>/dev/null || true);
+        lock_username=$(jq -r '.username // empty' <<<"$lock_json" 2>/dev/null || true);
+
+        # Check if the lock age is less than 24 hours.
+        if [[ -z $lock_age_seconds || $lock_age_seconds -lt 86400 ]]; then
+            _warning "Skipping ${command} because repository is locked (lock age: ${lock_age_seconds}s)";
+            return 0; # Locked, not stale.
+        fi
+
+        # Check if the lock username or hostname matches the local computer.
+        if [[ -z "$lock_hostname" || "$lock_hostname" != "$(hostname)" ]]; then
+            _warning "Skipping ${command} because repository is locked (lock hostname: ${lock_hostname})";
+            return 0; # Locked, not stale.
+        fi
+        if [[ -z "$lock_username" || "$lock_username" != "$(whoami)" ]]; then
+            _warning "Skipping ${command} because repository is locked (lock username: ${lock_username})";
+            return 0; # Locked, not stale.
+        fi
+    done <<<"$lock_ids";
+
+    _warning "Repository lock is stale; attempting auto-unlock…";
+    _restic_unlock;
+    return 1; # Unlocked.
 }
 
 function _restic_unlock() {
@@ -706,6 +748,7 @@ while getopts "ABb:C:c:d:e:f:HhInp:qt:u:Vv-:" opt; do
         (V) echo "restickler ${restickler_version} ($(type -P restic >/dev/null && restic version))"; exit 0;;
         (v) verbose="-v ${verbose}";;
         (-) case $OPTARG in
+            (allow-auto-unlock) allow_auto_unlock=1;;
             (help) _usage;;
             (install-config) _install_config;;
             (self-update) _self_update;;

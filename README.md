@@ -69,28 +69,29 @@ Back up SOURCE and run maintenance tasks on the configured restic repository.
 
 OPTIONS
 
-    -A                Abort if there has been no user activity since last back up.
-    -B                Abort if on battery power.
-    -b HOURS          Min interval between back up operations (currently every 0 hours).
-    -C FILE           Path to environment config file (default: ~/.config/restickler/env).
-    -c HOURS          Min interval between check operations (currently every 720 hours).
-    -d MBPS|%         Limit download speed in Mb/s or as a percentage of available bandwidth.
-    -e FILE           File containing back up exclusion rules, used as --exclude-file=FILE.
-    -f HOURS          Min interval between forget operations (currently every 168 hours).
-    -H                Abort if connected to an iOS hotspot.
-    -h, --help        Display this help message.
-    -I                Abort if internet is unreliable.
-    --install-config  Install example config files (will not overwrite existing files):
-                        ~/.config/restickler/env
-                        ~/.config/restickler/exclude/default.txt
-    -n                Dry run: print the expected outcome to the screen; don’t actually do anything.
-    -p HOURS          Min interval between prune operations (currently every 240 hours).
-    -q                Do not output comprehensive progress report.
-    --self-update     Download the replace restickler with the latest release from GitHub.
-    -t TASK,TASK,…   A list of tasks to complete on SOURCE (default: backup,restore,forget,prune,check)
-    -u MBPS|%         Limit upload speed in Mb/s or as a percentage of available bandwidth.
-    -v                Display verbose output (-vv to list uploaded files; -vvv to show debugging output).
-    -V, --version     Print version information.
+    -A                  Abort if there has been no user activity since last back up.
+    -B                  Abort if on battery power.
+    -b HOURS            Min interval between back up operations (currently every 0 hours).
+    -C FILE             Path to environment config file (default: ~/.config/restickler/env).
+    -c HOURS            Min interval between check operations (currently every 720 hours).
+    -d MBPS|%           Limit download speed in Mb/s or as a percentage of available bandwidth.
+    -e FILE             File containing back up exclusion rules, used as --exclude-file=FILE.
+    -f HOURS            Min interval between forget operations (currently every 168 hours).
+    -H                  Abort if connected to an iOS hotspot.
+    -h, --help          Display this help message.
+    -I                  Abort if internet is unreliable.
+    --allow-auto-unlock Automatically unlock stale repository locks (older than 24h, same host+user, restic not running).
+    --install-config    Install example config files (will not overwrite existing files):
+                          ~/.config/restickler/env
+                          ~/.config/restickler/exclude/default.txt
+    -n                  Dry run: print the expected outcome to the screen; don’t actually do anything.
+    -p HOURS            Min interval between prune operations (currently every 240 hours).
+    -q                  Do not output comprehensive progress report.
+    --self-update       Download the replace restickler with the latest release from GitHub.
+    -t TASK,TASK,…     A list of tasks to complete on SOURCE (default: backup,restore,forget,prune,check)
+    -u MBPS|%           Limit upload speed in Mb/s or as a percentage of available bandwidth.
+    -v                  Display verbose output (-vv to list uploaded files; -vvv to show debugging output).
+    -V, --version       Print version information.
 
 Restickler, by default, runs these commands in sequence to maintain the full lifecycle of a healthy repository:
 
