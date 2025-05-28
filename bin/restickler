@@ -763,7 +763,7 @@ while getopts "ABb:C:c:d:e:f:HhInp:qt:u:Vv-:" opt; do
             (install-config) _install_config;;
             (self-update) _self_update;;
             (version) echo "restickler ${restickler_version} ($(type -P restic >/dev/null && restic version))"; exit 0;;
-            (?) _error "Invalid option: \`${OPTARG}\`. Use -h for help.";;
+            (*) _error "Invalid option: \`--${OPTARG}\`. Use -h for help.";;
         esac ;;
         (?) _error "Invalid option: \`${opt}\`. Use -h for help.";;
         (*) _error "An unexpected error occurred.";;
