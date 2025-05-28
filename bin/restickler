@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.3.2';
+restickler_version='1.3.3';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -538,7 +538,7 @@ function _restic_test_restore() {
         return 1;
     fi
     _info "Starting test restore";
-    local latest_snapshot;
+    local latest_snapshot='';
     [[ -n $dryrun ]] || latest_snapshot=$(restic --no-lock snapshots --json --path "$1" latest | jq -re '.[0].short_id' || _error "Failed to find a snapshot with the canary file");
     # shellcheck disable=SC2086
     $dryrunexec $caffeinate restic $quiet $verbose restore "$latest_snapshot" \
@@ -823,9 +823,7 @@ function _trap() {
             rm -fr "${tmp_dir}/restickler/lock";
             local canary_dir;
             canary_dir=$(dirname "$canary_file");
-            if [[ $canary_dir == */.restickler-canary ]]; then
-                rm -fr "$canary_dir";
-            fi
+            [[ $canary_dir == */.restickler-canary ]] && rm -fr "$canary_dir";
             ;;
         (*) _error "Unhandled signal ${sig} with status ${status} on line ${line}";;
     esac
