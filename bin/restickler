@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.3.3';
+restickler_version='1.3.4';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -371,18 +371,20 @@ function _computer_has_been_idle() {
     (( last_backup_time > idle_begin_time ));
 }
 
+# Return true if on macOS battery power.
 function _on_battery_power() {
-    # Return true if on macOS battery power.
-    type -P pmset >/dev/null && pmset -g batt | grep -q "Now drawing from 'Battery Power'";
-    # Return exit status of last command (required because pipefail flag is on).
-    return "${PIPESTATUS[${#PIPESTATUS[@]}-1]}";
+    local output;
+    type -P pmset >/dev/null || return 1;
+    output=$(pmset -g batt);
+    [[ "$output" == *"Now drawing from 'Battery Power'"* ]];
 }
 
+# Return true if connected to an iOS Personal Hotspot (which seems to reliably assign an IP address in the 172.20.10.xxx range).
 function _connected_to_hotspot() {
-    # Return true if connected to an iOS Personal Hotspot (which seems to reliably assign an IP address in the 172.20.10.xxx range).
-    type -P networksetup >/dev/null && networksetup -listallnetworkservices | grep -v '\*' | tr '\n' '\0' | xargs -0 -n 1 networksetup -getinfo 2>&1 | grep -q 'IP address: 172\.20\.10\.';
-    # Return exit status of last command (required because pipefail flag is on).
-    return "${PIPESTATUS[${#PIPESTATUS[@]}-1]}";
+    local output;
+    type -P networksetup >/dev/null || return 1;
+    output=$(networksetup -listallnetworkservices | grep -v '\*' | tr '\n' '\0' | xargs -0 -n 1 networksetup -getinfo 2>&1);
+    [[ "$output" == *"IP address: 172.20.10."* ]];
 }
 
 # Detect if any RESTIC processes are running on this computer. If no processes are running, returns an empty string. If any processes end with the word RESTIC. Return the command names enclosed in quotes and comma separated.
@@ -753,7 +755,7 @@ while getopts "ABb:C:c:d:e:f:HhInp:qt:u:Vv-:" opt; do
         (n) dryrun='--dry-run'; dryrunexec='echo DRY-RUN:';;
         (p) prune_interval_hours=${OPTARG%.*};;
         (q) quiet="--quiet";;
-        (t) IFS=',' read -ra tasks <<< "$OPTARG";;
+        (t) IFS=',' read -ra tasks <<<"$OPTARG";;
         (u) ul_limit=$OPTARG;;
         (V) echo "restickler ${restickler_version} ($(type -P restic >/dev/null && restic version))"; exit 0;;
         (v) verbose="-v ${verbose}";;
@@ -823,7 +825,7 @@ function _trap() {
             rm -fr "${tmp_dir}/restickler/lock${dryrun}";
             local canary_dir;
             canary_dir=$(dirname "$canary_file");
-            [[ $canary_dir == */.restickler-canary ]] && rm -fr "$canary_dir";
+            [[ $canary_dir == */.restickler-canary ]] && rm -fr "$canary_dir" || true;
             ;;
         (*) _error "Unhandled signal ${sig} with status ${status} on line ${line}";;
     esac
@@ -836,7 +838,7 @@ trap '_trap EXIT $LINENO' EXIT;
 
 # Load environment variables used by restic and restickler.
 # shellcheck disable=SC1090
-[[ -f "$config_file" ]] && source "$config_file";
+[[ -f "$config_file" && -r "$config_file" ]] && source "$config_file";
 if [[ -z ${RESTIC_REPOSITORY:-} || ( -z ${RESTIC_PASSWORD_COMMAND:-} && -z ${RESTIC_PASSWORD:-} ) ]]; then
     _error "Missing restic environment variable(s): RESTIC_REPOSITORY and/or RESTIC_PASSWORD_COMMAND; see https://restic.readthedocs.io/en/latest/040_backup.html#environment-variables";
 fi
