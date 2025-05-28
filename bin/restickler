@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.3.1';
+restickler_version='1.3.2';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -268,27 +268,33 @@ function _online {
 function _speedtest() {
     local megabytes=2 concurrency=8 dl_bytes ul_bytes config dl_url ul_url dl_raw dl_bps ul_raw ul_bps;
 
-    curl --tlsv1.3 -sfZ --parallel-immediate --version &>/dev/null || _error "The installed version of curl does not support --tlsv1.3 or -Z, required for restickler’s speedtest features.";
+    # This function relies on curl's parallel transfer functionality.
+    curl --parallel --version &>/dev/null || { _warning "Speedtest disabled because curl does not support parallel transfers"; return 1; }
 
-    config=$(curl --tlsv1.3 -s https://mensura.cdn-apple.com/api/v1/gm/config 2>/dev/null || true);
-    dl_url=$(jq -r '.urls.large_https_download_url' <<<"$config" 2>/dev/null || true);
-    ul_url=$(jq -r '.urls.https_upload_url' <<<"$config" 2>/dev/null || true);
+    # cdn-apple.com requires TLS 1.3 support, which is inconsistent across OSs.
+    # This command works on macOS and modern Linux distros.
+    config=$(curl -s https://mensura.cdn-apple.com/api/v1/gm/config 2>/dev/null || true)
 
-    if [[ -z $dl_url || -z $ul_url || $dl_url == "null" || $ul_url == "null" ]]; then
-        _error "Failed to get speed test config.";
+    # This command works on some older Linux that require manually specifying `--tlsv1.3` (e.g., CentOS 7).
+    if [[ -z $config ]] && curl --help 2>&1 | grep -q -- '--tlsv1\.3'; then
+        config=$(curl --tlsv1.3 -s https://mensura.cdn-apple.com/api/v1/gm/config 2>/dev/null || true)
     fi
+
+    dl_url=$(jq -r '.urls.large_https_download_url // empty' <<<"$config" 2>/dev/null || true);
+    ul_url=$(jq -r '.urls.https_upload_url // empty' <<<"$config" 2>/dev/null || true);
+    [[ -z $config || -z $dl_url || -z $ul_url ]] && { _warning "Speedtest disabled – failed to connect to mensura.cdn-apple.com (no TLS 1.3 support?)"; return 1; }
 
     dl_bytes=$((megabytes*1024*1024/concurrency));
     ul_bytes=$((dl_bytes/2)); # UL is accurate using half as much data.
 
     # Download test in parallel; sum download speeds excluding connection time.
     # shellcheck disable=SC2046
-    dl_raw=$(curl --tlsv1.3 -sfZ --connect-timeout 3 --parallel-immediate -H "Range: bytes=0-${dl_bytes}" -w "(%{size_download} / (%{time_total} - %{time_starttransfer})) +" $(for ((i=1; i<=concurrency; i++)); do echo -n "${dl_url} -o /dev/null "; done) 2>/dev/null || true);
+    dl_raw=$(curl -s --fail --parallel --connect-timeout 3 --parallel-immediate -H "Range: bytes=0-${dl_bytes}" -w "(%{size_download} / (%{time_total} - %{time_starttransfer})) +" $(for ((i=1; i<=concurrency; i++)); do echo -n "${dl_url} -o /dev/null "; done) 2>/dev/null || true);
     dl_bps=$(bc <<<"scale=0; (${dl_raw} 0) * 8");
 
     # Upload random data in parallel; the /slurp endpoint returns json with a BPS value that we sum for the total bytes/second that are transfered during this test.
     # shellcheck disable=SC2046
-    ul_raw=$(head -c "$ul_bytes" /dev/random | curl --tlsv1.3 -sfZ --connect-timeout 3 --parallel-immediate --data-binary '@-' $(for ((i=1; i<=concurrency; i++)); do echo -n "${ul_url} "; done) 2>/dev/null || true);
+    ul_raw=$(head -c "$ul_bytes" /dev/random | curl -s --fail --parallel --connect-timeout 3 --parallel-immediate --data-binary '@-' $(for ((i=1; i<=concurrency; i++)); do echo -n "${ul_url} "; done) 2>/dev/null || true);
     # shellcheck disable=SC2015
     ul_bps=$(jq -e . <<<"$ul_raw" &>/dev/null && jq 'reduce inputs.BPS as $n (.; .BPS += ($n * 8)) | .BPS' <<<"$ul_raw" || true);
 
@@ -304,7 +310,7 @@ function _speedtest() {
 
 function _network_quality() {
     # Return cached internet speed test results
-    # The JSON is formatted to use output from macOS's `networkQuality` command (only available on macOS 12+), but that prerequisite has been removed; not speedtest is using only curl.
+    # The JSON is formatted to use output from macOS's `networkQuality` command (only available on macOS 12+), but that prerequisite has been removed; now speedtest is using only curl.
     local jqfilter=${1:-.};
 
     if [[ ! -s "${state_dir}/network_quality.json" && ($do_check_internet || $dl_limit == *% || $ul_limit == *%) ]]; then
@@ -344,8 +350,12 @@ function _convert_limit() {
 }
 
 function _reliable_internet() {
+    local ul_responsiveness dl_throughput ul_throughput;
+    ul_responsiveness=$(_network_quality .ul_responsiveness || echo 0);
+    dl_throughput=$(_network_quality .dl_throughput || echo 0);
+    ul_throughput=$(_network_quality .ul_throughput || echo 0);
     # Return true if the network has an RPM < 50, DL < 0.5Mbps, or UL < 0.5Mbps.
-    (( $(_network_quality .ul_responsiveness) > 50 && $(_network_quality .dl_throughput) > 524288 && $(_network_quality .ul_throughput) > 524288 ));
+    (( ul_responsiveness > 50 && dl_throughput > 524288 && ul_throughput > 524288 ));
 }
 
 function _computer_has_been_idle() {
@@ -492,7 +502,7 @@ function _restic_backup() {
     fi
 
     # Create a “canary” file in the first path argument. A canary file is 1KB of random data which is used to test restore.
-    if [[ -d "$1" && -w "$1" ]]; then
+    if [[ -d "$1" && -w "$1" && -r /dev/urandom ]]; then
         mkdir -p "${1}/.restickler-canary" "${tmp_dir}/restickler/restore/${1}/.restickler-canary" || _error "Failed to create temporary directories: \`${1}/.restickler-canary\`, \`${tmp_dir}/restickler/restore/${1}/.restickler-canary\`";
         find "${1}/.restickler-canary" "${tmp_dir}/restickler/restore/${1}/.restickler-canary" -type f -delete 2>/dev/null || true;
         canary_file="${1}/.restickler-canary/$(TZ=UTC date '+%FT%H%M%SZ')";
@@ -770,7 +780,7 @@ fi
 [[ -z $dl_limit || $dl_limit =~ ^[0-9]+(\.[0-9]+)?%?$ ]] || _error "Download speed limit must be a number (e.g., \`-d 10.5\`) or a percentage (e.g., \`-d 75%\`).";
 [[ -z $ul_limit || $ul_limit =~ ^[0-9]+(\.[0-9]+)?%?$ ]] || _error "Upload speed limit must be a number (e.g., \`-u 10.5\`) or a percentage (e.g., \`-u 75%\`).";
 [[ $backup_interval_hours =~ ^[0-9]+$ ]] || _error "Backup interval must be an integer (e.g., \`-b 1\`).";
-[[ $check_interval_hours =~ ^[0-9]+$ ]]  || _error "Check interval must be an integer (e.g., \`-c 168\`).";
+[[ $check_interval_hours =~ ^[0-9]+$ ]]  || _error "Check interval must be an integer (e.g., \`-c 720\`).";
 [[ $forget_interval_hours =~ ^[0-9]+$ ]] || _error "Forget interval must be an integer (e.g., \`-f 24\`).";
 [[ $prune_interval_hours =~ ^[0-9]+$ ]]  || _error "Prune interval must be an integer (e.g., \`-p 240\`).";
 
@@ -793,7 +803,8 @@ done
 
 # Enforce single-instance execution (via mkdir, which creates atomic lock and check at once).
 # A design goal of restickler is to complete its tasks as quickly as possible. As such, we want to avoid resource contention.
-mkdir "${tmp_dir}/restickler/lock" 2>/dev/null || {
+# Use of --dry-run has a different lock file (/tmp/restickler/lock--dry-run) to allow testing while backups may be in process.
+mkdir "${tmp_dir}/restickler/lock${dryrun}" 2>/dev/null || {
     _info "Another restickler process is running (lock exists; restic process: $(_running_restic_processes)).";
     exit 1;
 };
@@ -801,7 +812,7 @@ mkdir "${tmp_dir}/restickler/lock" 2>/dev/null || {
 # Internet speed test results are regenerated each time restickler runs.
 rm -f "${state_dir}/network_quality.json";
 
-_trap() {
+function _trap() {
     local status=$? sig=$1 line=$2;
     case $sig in
         (HUP) _info "Received SIGHUP; continuing anyways…";;
