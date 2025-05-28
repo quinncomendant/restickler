@@ -820,7 +820,7 @@ function _trap() {
         (ERR) _error "Exit status ${status} on line ${line}: \`${BASH_COMMAND}\`";;
         # Trap EXIT must occur after the lock test, otherwise the exit would remove the lock used by the other process.
         (EXIT)
-            rm -fr "${tmp_dir}/restickler/lock";
+            rm -fr "${tmp_dir}/restickler/lock${dryrun}";
             local canary_dir;
             canary_dir=$(dirname "$canary_file");
             [[ $canary_dir == */.restickler-canary ]] && rm -fr "$canary_dir";
