@@ -2,14 +2,13 @@
 
 # On macOS: repository password is saved in the System Keychain.
 # To use restic from the terminal and cron, you have to add the password to both login and System keychains:
-# 1. Add the password to the login keychain: `security add-generic-password -s restic-repo-pw -a restic -w`
+# 1. Add the password to the login keychain: `security add-generic-password -a restic -s restic-repo-pw -w`
 # 2. Copy it from the login keychain to the System keychain (right-click copy in login → right-click paste in System).
-#
-# On Linux you save your password to `~/.config/restickler/restic-repo-pw` (`chmod 600 …`) and
-# set RESTIC_PASSWORD_COMMAND to 'cat ~/.config/restickler/restic-repo-pw'.
+export RESTIC_PASSWORD_COMMAND='security find-generic-password -a restic -s restic-repo-pw -w';
+# On Linux you save your password to `~/.config/restickler/restic-repo-pw` (`chmod 600 …`) and use:
+#export RESTIC_PASSWORD_COMMAND="cat $HOME/.config/restickler/restic-repo-pw";
 # You may also use the RESTIC_PASSWORD variable, but this is less secure, because exported variables
 # containing credentials may be revealed accidentally.
-export RESTIC_PASSWORD_COMMAND='security find-generic-password -a restic -s restic-repo-pw -w';
 
 # The repository to backup to and restore from.
 # If using GCP object storage: `gs:YOUR_BUCKET_NAME:/`.

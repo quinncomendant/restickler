@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.3.4';
+restickler_version='1.3.5';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -397,9 +397,7 @@ function _repository_is_locked() {
     local command=$1 lock_ids restic_process;
 
     lock_ids=$(restic -q --no-lock list locks 2>/dev/null || true);
-    if [[ -z "$lock_ids" ]]; then
-        return 1; # Not locked
-    fi
+    [[ -z "$lock_ids" ]] && return 1; # Not locked
 
     # Check if restic process is currently running on local computer.
     restic_process=$(_running_restic_processes);
@@ -408,39 +406,51 @@ function _repository_is_locked() {
         return 0; # Locked, not stale.
     fi
 
+    # Loop through all locks and exit on the first non-stale lock.
+    local lock_id lock_json lock_exclusive lock_hostname lock_username lock_time lock_age_seconds;
+    while IFS= read -r lock_id; do
+        [[ -n "$lock_id" ]] || continue;
+        lock_json=$(restic --json -q --no-lock cat lock "$lock_id" 2>/dev/null || false) || continue;
+
+        # The most common case is restic backup with all non-exclusive locks.
+        # In a healthy repository, all lock types will be the same.
+        lock_exclusive=$(jq -r '.exclusive // "false"' <<<"$lock_json" 2>/dev/null || echo 'false');
+        if [[ $command == 'backup' && $lock_exclusive == 'false' ]]; then
+            return 1; # Locked, but backup may proceed with non-exclusive lock.
+        fi
+
+        # From here: $command requires an exclusive lock, or an exclusive lock was encountered.
+
+        # Terminate if a lock has a hostname != the local computer.
+        lock_hostname=$(jq -r '.hostname // empty' <<<"$lock_json" 2>/dev/null || true);
+        if [[ -z "$lock_hostname" || "$lock_hostname" != "$(hostname)" ]]; then
+            _warning "Skipping ${command} because repository is locked (lock hostname: ${lock_hostname})";
+            return 0; # Locked, not stale.
+        fi
+
+        # Terminate if a lock has a username != the local user.
+        lock_username=$(jq -r '.username // empty' <<<"$lock_json" 2>/dev/null || true);
+        if [[ -z "$lock_username" || "$lock_username" != "$(whoami)" ]]; then
+            _warning "Skipping ${command} because repository is locked (lock username: ${lock_username})";
+            return 0; # Locked, not stale.
+        fi
+
+        # Terminate if a lock has a lock age is less than 24 hours.
+        lock_time=$(jq -r '.time // empty' <<<"$lock_json" 2>/dev/null || true);
+        lock_time=${lock_time%%.*};
+        lock_time=${lock_time/T/ };
+        lock_age_seconds=$(( $(date +%s) - $(date -d "$lock_time" +%s 2>/dev/null || date -j -f "%Y-%m-%d %H:%M:%S" "$lock_time" +%s 2>/dev/null || echo 0) ));
+        if [[ -z $lock_age_seconds || $lock_age_seconds -lt 86400 ]]; then
+            _warning "Skipping ${command} because repository is locked (lock age: ${lock_age_seconds}s)";
+            return 0; # Locked, not stale.
+        fi
+    done <<<"$lock_ids";
+
     # If auto-unlock is not enabled, log a warning with instructions to manually unlock the repo.
     if [[ -z $allow_auto_unlock ]]; then
         _warning "Skipping ${command} because repository is locked (run \`source \"$config_file\" && restic unlock\` after confirming no restic processes are running)";
         return 0;
     fi
-
-    local lock_id lock_json lock_time lock_hostname lock_username lock_age_seconds;
-    while IFS= read -r lock_id; do
-        [[ -n "$lock_id" ]] || continue;
-        lock_json=$(restic --json -q --no-lock cat lock "$lock_id" 2>/dev/null || echo '{}');
-        lock_time=$(jq -r '.time // empty' <<<"$lock_json" 2>/dev/null || true);
-        lock_time=${lock_time%%.*};
-        lock_time=${lock_time/T/ };
-        lock_age_seconds=$(( $(date +%s) - $(date -d "$lock_time" +%s 2>/dev/null || date -j -f "%Y-%m-%d %H:%M:%S" "$lock_time" +%s 2>/dev/null || echo 0) ));
-        lock_hostname=$(jq -r '.hostname // empty' <<<"$lock_json" 2>/dev/null || true);
-        lock_username=$(jq -r '.username // empty' <<<"$lock_json" 2>/dev/null || true);
-
-        # Check if the lock age is less than 24 hours.
-        if [[ -z $lock_age_seconds || $lock_age_seconds -lt 86400 ]]; then
-            _warning "Skipping ${command} because repository is locked (lock age: ${lock_age_seconds}s)";
-            return 0; # Locked, not stale.
-        fi
-
-        # Check if the lock username or hostname matches the local computer.
-        if [[ -z "$lock_hostname" || "$lock_hostname" != "$(hostname)" ]]; then
-            _warning "Skipping ${command} because repository is locked (lock hostname: ${lock_hostname})";
-            return 0; # Locked, not stale.
-        fi
-        if [[ -z "$lock_username" || "$lock_username" != "$(whoami)" ]]; then
-            _warning "Skipping ${command} because repository is locked (lock username: ${lock_username})";
-            return 0; # Locked, not stale.
-        fi
-    done <<<"$lock_ids";
 
     _warning "Repository lock is stale; attempting auto-unlock…";
     _restic_unlock;
