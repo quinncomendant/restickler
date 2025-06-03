@@ -45,8 +45,8 @@ do_check_battery='';
 do_check_hotspot='';
 do_check_internet='';
 backup_interval_hours=0;   # By default, back up every time.
-forget_interval_hours=168; # 7 days
-prune_interval_hours=240;  # 10 days
+forget_interval_hours=120; # 5 days
+prune_interval_hours=360;  # 15 days
 check_interval_hours=720;  # 30 days
 sent_healthchecks_start='';
 allow_auto_unlock='';
@@ -59,7 +59,7 @@ function _usage() {
     echo -n "restickler ${restickler_version}
 
 A wrapper for restic (https://restic.net/) that supervises back up, forget, prune, check,
-and restore test. Designed for macOS, but works on Linux too.
+and a test restore. Designed for macOS, but works on Linux too.
 https://github.com/quinncomendant/restickler
 Quinn Comendant <quinn@strangecode.com>
 
@@ -98,7 +98,7 @@ OPTIONS
 Restickler, by default, runs these commands in sequence to maintain the full lifecycle of a healthy repository:
 
     1. \`restic backup\` (every ${backup_interval_hours} hours or as specified by -b)
-    2. \`restic restore\` (restore test file from SOURCE/.restickler-canary/UTC_DATE_TIME)
+    2. \`restic restore\` (test restore of file from SOURCE/.restickler-canary/UTC_DATE_TIME)
     3. \`restic forget\` (every ${forget_interval_hours} hours or as specified by -f)
     4. \`restic prune\` (every ${prune_interval_hours} hours or as specified by -p)
     5. \`restic check\` (every ${check_interval_hours} hours or as specified by -c)
@@ -152,7 +152,7 @@ the \`${state_dir}/last-*-time*\` files would also reset the interval timer):
 A sane configuration for crontab on macOS: double verbosity to log files as they upload,
 skip back up when idle, on battery, using hotspot, or unreliable internet, with upload
 and download limited to 75% of available bandwidth (cron needs % to be escaped). Although
-it runs every 5 minutes, back up will happen at most only once per hour:
+it runs every 5 minutes, back up will happen at most only once per hour (\`-b 1\`):
 
     */5 * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 \$HOME >/dev/null
 " | sed "s!${HOME}!~!g" 1>&2
@@ -509,7 +509,7 @@ function _restic_backup() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -A "$(hostname -s)" -X POST  --data-binary "Starting back up of $*" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$(hostname -s)" -X POST --data-binary "Starting back up of $*" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -793,9 +793,9 @@ fi
 [[ -z $dl_limit || $dl_limit =~ ^[0-9]+(\.[0-9]+)?%?$ ]] || _error "Download speed limit must be a number (e.g., \`-d 10.5\`) or a percentage (e.g., \`-d 75%\`).";
 [[ -z $ul_limit || $ul_limit =~ ^[0-9]+(\.[0-9]+)?%?$ ]] || _error "Upload speed limit must be a number (e.g., \`-u 10.5\`) or a percentage (e.g., \`-u 75%\`).";
 [[ $backup_interval_hours =~ ^[0-9]+$ ]] || _error "Backup interval must be an integer (e.g., \`-b 1\`).";
+[[ $forget_interval_hours =~ ^[0-9]+$ ]] || _error "Forget interval must be an integer (e.g., \`-f 120\`).";
+[[ $prune_interval_hours =~ ^[0-9]+$ ]]  || _error "Prune interval must be an integer (e.g., \`-p 360\`).";
 [[ $check_interval_hours =~ ^[0-9]+$ ]]  || _error "Check interval must be an integer (e.g., \`-c 720\`).";
-[[ $forget_interval_hours =~ ^[0-9]+$ ]] || _error "Forget interval must be an integer (e.g., \`-f 24\`).";
-[[ $prune_interval_hours =~ ^[0-9]+$ ]]  || _error "Prune interval must be an integer (e.g., \`-p 240\`).";
 
 # Use the default tasks if none were submitted by the user.
 [[ ${#tasks[@]} -eq 0 ]] && tasks=("${tasks_default[@]}");
