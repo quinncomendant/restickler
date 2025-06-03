@@ -509,7 +509,7 @@ function _restic_backup() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -A "$(hostname -s)" -X POST --data-binary "Starting back up of $*" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$(hostname -s)" -X POST  --data-binary "Starting back up of $*" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -536,7 +536,8 @@ function _restic_backup() {
         2>&1 | { grep -v '^unchanged' || true; } | tee -a "$log_file" | { grep -Ev '^(modified|new)' || true; };
 
     local restic_exit_status=${PIPESTATUS[0]};
-    ((restic_exit_status == 0)) || _error "Failed to back up (exit status ${restic_exit_status})";
+    # exit 3 == backup command could not read some source data.
+    ((restic_exit_status == 0 || restic_exit_status == 3)) || _error "Failed to back up (exit status ${restic_exit_status})";
 
     # Save the timestamp of when this script began running to the `last-backup-time-…` file.
     [[ -z $dryrun ]] && echo -n "$script_start_time" >| "$last_backup_time_file";
@@ -832,10 +833,10 @@ function _trap() {
         (ERR) _error "Exit status ${status} on line ${line}: \`${BASH_COMMAND}\`";;
         # Trap EXIT must occur after the lock test, otherwise the exit would remove the lock used by the other process.
         (EXIT)
-            rm -fr "${tmp_dir}/restickler/lock${dryrun}";
+            [[ -d "${tmp_dir}/restickler/lock${dryrun}" ]] && rm -fr "${tmp_dir}/restickler/lock${dryrun}" || true;
             local canary_dir;
             canary_dir=$(dirname "$canary_file");
-            [[ $canary_dir == */.restickler-canary ]] && rm -fr "$canary_dir" || true;
+            [[ -d $canary_dir && $canary_dir == */.restickler-canary ]] && rm -fr "$canary_dir" || true;
             ;;
         (*) _error "Unhandled signal ${sig} with status ${status} on line ${line}";;
     esac
