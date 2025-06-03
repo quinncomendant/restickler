@@ -24,6 +24,7 @@ state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/restickler";
 config_file="${config_dir}/env";
 tmp_dir=/tmp;
 log_file="${state_dir}/log";
+log_tmp_file=$(mktemp);
 canary_file='';
 
 # Set up required directories.
@@ -196,25 +197,34 @@ function _self_update() {
     exit 0;
 }
 
+function _log() {
+    local print=${1:-true};
+    while IFS= read -r line; do
+        [[ $print == true ]] && echo "$line";
+        echo "$line" >> "$log_file";
+        echo "$line" >> "$log_tmp_file";
+    done
+}
+
 function _debug() {
     local IFS='' dt;
     dt=$(date '+%F %T');
     # shellcheck disable=SC2015
-    [[ $verbose =~ '-v -v -v' ]] && echo -e "[${dt}] [debug] $*" >> "$log_file" || true;
+    [[ $verbose =~ '-v -v -v' ]] && echo -e "[${dt}] [debug] $*" | _log false || true;
 }
 
 function _info() {
     local IFS='' dt;
     dt=$(date '+%F %T');
     # shellcheck disable=SC2015
-    [[ $verbose =~ '-v' ]] && echo -e "[${dt}] [info] $*" >> "$log_file" || true;
+    [[ $verbose =~ '-v' ]] && echo -e "[${dt}] [info] $*" | _log false || true;
     echo -e "${c_violet}[${dt}] ${c_bold}$*${c_off}";
 }
 
 function _warning() {
     local IFS='' dt;
     dt=$(date '+%F %T');
-    echo -e "[${dt}] [warning] $*" | tee -a "$log_file" 1>&2
+    echo -e "[${dt}] [warning] $*" | _log 1>&2
 }
 
 # USR1 signal is sent by _error to terminate the main script.
@@ -222,10 +232,11 @@ trap 'exit 1' USR1;
 function _error() {
     local IFS='' dt;
     dt=$(date '+%F %T');
-    echo -e "[${dt}] [error] $* ($(_elapsed) elapsed)" | tee -a "$log_file" 1>&2
+    echo -e "[${dt}] [error] $* ($(_elapsed) elapsed)" | _log 1>&2
     # Send “fail” signal to HealthChecks.io when run via cron.
+    local log_lines; log_lines=$(tail -c 10000 "$log_tmp_file" 2>/dev/null || true);
     # shellcheck disable=SC2015
-    [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} ]] && curl -fsS -A "$(hostname -s)" -X POST --data-binary "$*" --retry 3 "${HEALTHCHECKS_URL}/fail" >/dev/null || true;
+    [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} ]] && curl -fsS -A "$(hostname -s)" -X POST --data-raw "$(printf '%s\n\n---\n\n%s' "$*" "$log_lines")" --retry 3 "${HEALTHCHECKS_URL}/fail" >/dev/null || true;
     # Send a user-defined USR1 signal, which is trapped to exit the main process.
     kill -USR1 $$;
 }
@@ -248,6 +259,7 @@ function _todo() {
 };
 
 function _elapsed() {
+    [[ -n ${SECONDS:-} ]] || SECONDS=$(($(date +%s) - script_start_time));
     local d=$((SECONDS/86400));
     local h=$((SECONDS%86400/3600));
     local m=$((SECONDS%3600/60));
@@ -465,7 +477,7 @@ function _restic_unlock() {
 
     _info "Unlocking restic repository";
     # shellcheck disable=SC2086
-    $dryrunexec $caffeinate restic $quiet $verbose unlock 2>&1 | tee -a "$log_file";
+    $dryrunexec $caffeinate restic $quiet $verbose unlock 2>&1 | _log;
 
     local restic_exit_status=${PIPESTATUS[0]};
     ((restic_exit_status == 0)) || _error "Failed to unlock (exit status ${restic_exit_status})";
@@ -509,7 +521,7 @@ function _restic_backup() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -A "$(hostname -s)" -X POST --data-binary "Starting back up of $*" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$(hostname -s)" -X POST --data-raw "Starting back up of $* to ${RESTIC_REPOSITORY}" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -533,7 +545,7 @@ function _restic_backup() {
     $caffeinate restic $quiet $verbose $limit_download $limit_upload backup "$@" \
         $exclude_file \
         $dryrun \
-        2>&1 | { grep -v '^unchanged' || true; } | tee -a "$log_file" | { grep -Ev '^(modified|new)' || true; };
+        2>&1 | { grep -v '^unchanged' || true; } | _log | { grep -Ev '^(modified|new)' || true; };
 
     local restic_exit_status=${PIPESTATUS[0]};
     # exit 3 == backup command could not read some source data.
@@ -557,7 +569,7 @@ function _restic_test_restore() {
     $dryrunexec $caffeinate restic $quiet $verbose restore "$latest_snapshot" \
         --target "${tmp_dir}/restickler/restore" \
         --include "$canary_file" \
-        2>&1 | tee -a "$log_file" | { grep -v '^restoring' || true; };
+        2>&1 | _log | { grep -v '^restoring' || true; };
 
     local restic_exit_status=${PIPESTATUS[0]};
     ((restic_exit_status == 0)) || _error "Failed to restore (exit status ${restic_exit_status})";
@@ -592,7 +604,7 @@ function _restic_forget() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -A "$(hostname -s)" -X POST --data-binary "Starting forget" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$(hostname -s)" -X POST --data-raw "Starting forget on ${RESTIC_REPOSITORY}" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -650,7 +662,7 @@ function _restic_prune() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -A "$(hostname -s)" -X POST --data-binary "Starting prune" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$(hostname -s)" -X POST --data-raw "Starting prune on ${RESTIC_REPOSITORY}" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -661,7 +673,7 @@ function _restic_prune() {
     # shellcheck disable=SC2086
     $caffeinate restic $quiet $verbose $limit_download $limit_upload prune \
         $dryrun \
-        2>&1 | tee -a "$log_file";
+        2>&1 | _log;
 
     local restic_exit_status=${PIPESTATUS[0]};
     ((restic_exit_status == 0)) || _error "Failed to prune (exit status ${restic_exit_status})";
@@ -702,7 +714,7 @@ function _restic_check() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -A "$(hostname -s)" -X POST --data-binary "Starting check" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$(hostname -s)" -X POST --data-raw "Starting check on ${RESTIC_REPOSITORY}" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -715,7 +727,7 @@ function _restic_check() {
     # shellcheck disable=SC2086
     $dryrunexec $caffeinate restic $quiet $verbose $limit_download $limit_upload check \
         --read-data-subset="$(date +%-m)/12" \
-        2>&1 | tee -a "$log_file";
+        2>&1 | _log;
 
     local restic_exit_status=${PIPESTATUS[0]};
     ((restic_exit_status == 0)) || _error "Failed to check (exit status ${restic_exit_status})";
@@ -833,10 +845,10 @@ function _trap() {
         (ERR) _error "Exit status ${status} on line ${line}: \`${BASH_COMMAND}\`";;
         # Trap EXIT must occur after the lock test, otherwise the exit would remove the lock used by the other process.
         (EXIT)
-            [[ -d "${tmp_dir}/restickler/lock${dryrun}" ]] && rm -fr "${tmp_dir}/restickler/lock${dryrun}" || true;
-            local canary_dir;
-            canary_dir=$(dirname "$canary_file");
+            local canary_dir; canary_dir=$(dirname "$canary_file");
             [[ -d $canary_dir && $canary_dir == */.restickler-canary ]] && rm -fr "$canary_dir" || true;
+            [[ -f "$log_tmp_file" ]] && rm -fr "$log_tmp_file" || true;
+            [[ -d "${tmp_dir}/restickler/lock${dryrun}" ]] && rm -fr "${tmp_dir}/restickler/lock${dryrun}" || true;
             ;;
         (*) _error "Unhandled signal ${sig} with status ${status} on line ${line}";;
     esac
@@ -888,5 +900,6 @@ _info "Finished ${completed_tasks_list%, } ($(_elapsed) elapsed)";
 # Send “success” signal to HealthChecks.io when run via cron, but only if a /start ping was sent (which only occurs when a main action begins, i.e., back up, forget, prune, or check).
 # shellcheck disable=SC2015
 if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -n $sent_healthchecks_start ]]; then
-    curl -fsS -A "$(hostname -s)" -X POST --data-binary "Finished ${completed_tasks_list%, } on $* ($(_elapsed) elapsed)" --retry 3 "$HEALTHCHECKS_URL" >/dev/null || true;
+    log_lines=$(tail -c 10000 "$log_tmp_file" 2>/dev/null || true);
+    curl -fsS -A "$(hostname -s)" -X POST --data-raw "$(printf 'Finished %s of %s on %s (%s elapsed)\n\n---\n\n%s' "${completed_tasks_list%, }" "$*" "$RESTIC_REPOSITORY" "$(_elapsed)" "$log_lines")" --retry 3 "$HEALTHCHECKS_URL" >/dev/null || true;
 fi
