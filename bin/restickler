@@ -10,8 +10,13 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.3.6';
+restickler_version='1.3.7';
 script_start_time=$(date +%s);
+
+# RESTIC_HOST will be used by restic commands that accept --host (backup, restore, forget).
+# Also used as the Healthchecks.io User-Agent string.
+# Can be overridden in the config env.
+[[ -n ${RESTIC_HOST:-} ]] || export RESTIC_HOST=$(hostname);
 
 c_violet="\033[35m";
 c_bold="\033[1m";
@@ -236,7 +241,7 @@ function _error() {
     # Send “fail” signal to HealthChecks.io when run via cron.
     local log_lines; log_lines=$(tail -c 10000 "$log_tmp_file" 2>/dev/null || true);
     # shellcheck disable=SC2015
-    [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} ]] && curl -fsS -A "$(hostname -s)" -X POST --data-raw "$(printf '%s\n\n---\n\n%s' "$*" "$log_lines")" --retry 3 "${HEALTHCHECKS_URL}/fail" >/dev/null || true;
+    [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} ]] && curl -fsS -A "$RESTIC_HOST" -X POST --data-raw "$(printf '%s\n\n---\n\n%s' "$*" "$log_lines")" --retry 3 "${HEALTHCHECKS_URL}/fail" >/dev/null || true;
     # Send a user-defined USR1 signal, which is trapped to exit the main process.
     kill -USR1 $$;
 }
@@ -435,7 +440,7 @@ function _repository_is_locked() {
 
         # Terminate if a lock has a hostname != the local computer.
         lock_hostname=$(jq -r '.hostname // empty' <<<"$lock_json" 2>/dev/null || true);
-        if [[ -z "$lock_hostname" || "$lock_hostname" != "$(hostname)" ]]; then
+        if [[ -z "$lock_hostname" || "$lock_hostname" != "$RESTIC_HOST" ]]; then
             _warning "Skipping ${command} because repository is locked (lock hostname: ${lock_hostname})";
             return 0; # Locked, not stale.
         fi
@@ -521,7 +526,7 @@ function _restic_backup() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -A "$(hostname -s)" -X POST --data-raw "Starting back up of $* to ${RESTIC_REPOSITORY}" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$RESTIC_HOST" -X POST --data-raw "Starting back up of $* to ${RESTIC_REPOSITORY}" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -563,13 +568,9 @@ function _restic_test_restore() {
         return 1;
     fi
     _info "Starting test restore";
-    local latest_snapshot latest_snapshot_id='';
-    if [[ -z $dryrun ]]; then
-        latest_snapshot=$(restic --no-lock snapshots --json --path "$1" latest 2>&1);
-        latest_snapshot_id=$(jq -re '.[0].short_id' <<<"$latest_snapshot" || _error "Failed to restore canary “${canary_file}”. The latest snapshot ID for “$1” not found: ${latest_snapshot}");
-    fi
+
     # shellcheck disable=SC2086
-    $dryrunexec $caffeinate restic $quiet $verbose restore "$latest_snapshot_id" \
+    $dryrunexec $caffeinate restic $quiet $verbose restore latest \
         --target "${tmp_dir}/restickler/restore" \
         --include "$canary_file" \
         2>&1 | _log | { grep -v '^restoring' || true; };
@@ -608,7 +609,7 @@ function _restic_forget() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -A "$(hostname -s)" -X POST --data-raw "Starting forget on ${RESTIC_REPOSITORY}" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$RESTIC_HOST" -X POST --data-raw "Starting forget on ${RESTIC_REPOSITORY}" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -683,7 +684,7 @@ function _restic_prune() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -A "$(hostname -s)" -X POST --data-raw "Starting prune on ${RESTIC_REPOSITORY}" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$RESTIC_HOST" -X POST --data-raw "Starting prune on ${RESTIC_REPOSITORY}" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -735,7 +736,7 @@ function _restic_check() {
 
     # Send “start” signal to HealthChecks.io when run via cron, if it hasn't been sent yet.
     if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -z $sent_healthchecks_start ]]; then
-        curl -fsS -A "$(hostname -s)" -X POST --data-raw "Starting check on ${RESTIC_REPOSITORY}" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
+        curl -fsS -A "$RESTIC_HOST" -X POST --data-raw "Starting check on ${RESTIC_REPOSITORY}" --retry 3 "${HEALTHCHECKS_URL}/start" >/dev/null || true;
         sent_healthchecks_start=1;
     fi
 
@@ -772,7 +773,7 @@ for requiredcmd in restic curl jq bc tr awk sed readlink curl; do
     type -P "$requiredcmd" >/dev/null || _error "The '$requiredcmd' command is not available";
 done
 
-restic_min_version='0.14.0';
+restic_min_version='0.17.0';
 restic_installed_version=$(restic version | awk '{print $2}');
 if [[ "$restic_min_version" != "$(echo -e "${restic_installed_version}\n${restic_min_version}" | sort -V | head -1)" ]]; then
     _error "This script requires restic >= $restic_min_version (installed version is ${restic_installed_version}). Upgrade with: \`$(readlink -f "$(which restic)") self-update\`.";
@@ -922,5 +923,5 @@ _info "Finished ${completed_tasks_list%, } ($(_elapsed) elapsed)";
 # shellcheck disable=SC2015
 if [[ -z $dryrun && $TERM == 'dumb' && -n ${HEALTHCHECKS_URL:-} && -n $sent_healthchecks_start ]]; then
     log_lines=$(tail -c 10000 "$log_tmp_file" 2>/dev/null || true);
-    curl -fsS -A "$(hostname -s)" -X POST --data-raw "$(printf 'Finished %s of %s on %s (%s elapsed)\n\n---\n\n%s' "${completed_tasks_list%, }" "$*" "$RESTIC_REPOSITORY" "$(_elapsed)" "$log_lines")" --retry 3 "$HEALTHCHECKS_URL" >/dev/null || true;
+    curl -fsS -A "$RESTIC_HOST" -X POST --data-raw "$(printf 'Finished %s of %s on %s (%s elapsed)\n\n---\n\n%s' "${completed_tasks_list%, }" "$*" "$RESTIC_REPOSITORY" "$(_elapsed)" "$log_lines")" --retry 3 "$HEALTHCHECKS_URL" >/dev/null || true;
 fi
