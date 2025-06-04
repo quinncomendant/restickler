@@ -166,16 +166,16 @@ function _install_config() {
     if [[ -e "$config_file" ]]; then
         _info "$config_file file already exists; skipping";
     else
-        http_code=$(curl -sL -w '%{http_code}' -o "$config_file" "https://raw.githubusercontent.com/quinncomendant/restickler/master/config/env?t=${script_start_time}");
-        [[ $http_code == 200 && -s "$config_file" ]] || _error "Failed to install $config_file (HTTP code ${http_code})";
+        http_code=$(curl -sL -H 'Cache-Control: no-cache' -w '%{http_code}' -o "$config_file" "https://raw.githubusercontent.com/quinncomendant/restickler/master/config/env?t=${script_start_time}");
+        [[ $http_code == 200 && -s "$config_file" ]] || _error "Failed to install $config_file (HTTP ${http_code:-curl error})";
         chmod 600 "$config_file";
         _info "Installed: \`$config_file\` from https://github.com/quinncomendant/restickler/blob/master/config/env";
     fi
     if [[ -e "${config_dir}/exclude/default.txt" ]]; then
         _info "${config_dir}/exclude/default.txt file already exists; skipping";
     else
-        http_code=$(curl -sL -w '%{http_code}' -o "${config_dir}/exclude/default.txt" "https://raw.githubusercontent.com/quinncomendant/restickler/master/config/exclude/default.txt?t=${script_start_time}");
-        [[ $http_code == 200 && -s "${config_dir}/exclude/default.txt" ]] || _error "Failed to install ${config_dir}/exclude/default.txt (HTTP code ${http_code})";
+        http_code=$(curl -sL -H 'Cache-Control: no-cache' -w '%{http_code}' -o "${config_dir}/exclude/default.txt" "https://raw.githubusercontent.com/quinncomendant/restickler/master/config/exclude/default.txt?t=${script_start_time}");
+        [[ $http_code == 200 && -s "${config_dir}/exclude/default.txt" ]] || _error "Failed to install ${config_dir}/exclude/default.txt (HTTP ${http_code:-curl error})";
         _info "Installed: \`${config_dir}/exclude/default.txt\` from https://github.com/quinncomendant/restickler/blob/master/config/exclude/default.txt";
     fi
     exit 0;
@@ -186,8 +186,8 @@ function _self_update() {
     tmp_dl="${tmp_dir}/restickler-${script_start_time}-$(head -c 100 /dev/urandom | LC_ALL=C tr -dc '0-9A-Za-z')";
     cp -p "$self" "$tmp_dl"; # Copy existing script just to retain permissions.
     restickler_url="https://raw.githubusercontent.com/quinncomendant/restickler/master/bin/restickler?t=${script_start_time}";
-    http_code=$(curl -sL -w '%{http_code}' -o "$tmp_dl" "$restickler_url");
-    [[ $http_code == 200 && -s "$tmp_dl" ]] || _error "Failed to download ${restickler_url} (HTTP code ${http_code})";
+    http_code=$(curl -sL -H 'Cache-Control: no-cache' -w '%{http_code}' -o "$tmp_dl" "$restickler_url");
+    [[ $http_code == 200 && -s "$tmp_dl" ]] || _error "Failed to download ${restickler_url} (HTTP ${http_code:-curl error})";
     tmp_version=$(sed -n '/^restickler_version=/s/[^0-9.]//gp' "$tmp_dl" || true);
     if [[ "$restickler_version" == "$tmp_version" ]]; then
         _info "restickler ${restickler_version} is currently the newest version available.";
