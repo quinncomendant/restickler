@@ -608,20 +608,37 @@ function _restic_forget() {
         sent_healthchecks_start=1;
     fi
 
+    # Default retention policy values apply when a var is not defined in a config env, i.e., comment out the config variables to use these defaults.
+    KEEP_LAST=${KEEP_LAST-72};                     # Fail-safe: keep at least 72 snapshots
+    KEEP_WITHIN_HOURLY=${KEEP_WITHIN_HOURLY-3d};   # 72 hourly
+    KEEP_WITHIN_DAILY=${KEEP_WITHIN_DAILY-15d};    # 15 daily
+    KEEP_WITHIN_WEEKLY=${KEEP_WITHIN_WEEKLY-75d};  # 10.7 weekly
+    KEEP_WITHIN_MONTHLY=${KEEP_WITHIN_MONTHLY-1y}; # 12 monthly
+    KEEP_WITHIN_YEARLY=${KEEP_WITHIN_YEARLY-5y};   # 5 yearly
+                                                   # ≈ at most 115 snapshots per host+path group
+    [[ $KEEP_LAST =~ ^[1-9][0-9]*$ ]] || _error "KEEP_LAST config value must be > 0";
+    local RETENTION_POLICY=(
+        ${KEEP_LAST:+--keep-last "$KEEP_LAST"}
+        ${KEEP_WITHIN_HOURLY:+--keep-within-hourly "$KEEP_WITHIN_HOURLY"}
+        ${KEEP_WITHIN_DAILY:+--keep-within-daily "$KEEP_WITHIN_DAILY"}
+        ${KEEP_WITHIN_WEEKLY:+--keep-within-weekly "$KEEP_WITHIN_WEEKLY"}
+        ${KEEP_WITHIN_MONTHLY:+--keep-within-monthly "$KEEP_WITHIN_MONTHLY"}
+        ${KEEP_WITHIN_YEARLY:+--keep-within-yearly "$KEEP_WITHIN_YEARLY"}
+    );
+
     _info "Starting forget";
     local limit_download limit_upload;
     limit_download=$(_convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
     limit_upload=$(_convert_limit "$ul_limit" ".ul_throughput" "--limit-upload");
     # shellcheck disable=SC2086
+    [[ -n $dryrun ]] && $dryrunexec $caffeinate restic $quiet $verbose $limit_download $limit_upload forget \
+        "${RETENTION_POLICY[@]}" \
+        $dryrun;
+    # shellcheck disable=SC2086
     $caffeinate restic $quiet $verbose $limit_download $limit_upload forget \
-        --keep-last 72 \
-        --keep-within-hourly 14d \
-        --keep-within-daily 45d \
-        --keep-within-weekly 3m \
-        --keep-within-monthly 1y \
-        --keep-within-yearly 10y \
+        "${RETENTION_POLICY[@]}" \
         $dryrun \
-        2>&1 | tee -a "$log_file";
+        2>&1 | _log;
 
     local restic_exit_status=${PIPESTATUS[0]};
     ((restic_exit_status == 0)) || _error "Failed to forget (exit status ${restic_exit_status})";

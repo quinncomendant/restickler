@@ -19,6 +19,15 @@ export RESTIC_REPOSITORY='';
 # https://restic.readthedocs.io/en/stable/047_tuning_backup_parameters.html
 export RESTIC_COMPRESSION='auto';
 
+# Retention policy. Uncomment to unset or override default values.
+# https://restic.readthedocs.io/en/stable/060_forget.html
+#export KEEP_LAST='72';
+#export KEEP_WITHIN_HOURLY='3d';
+#export KEEP_WITHIN_DAILY='15d';
+#export KEEP_WITHIN_WEEKLY='75d';
+#export KEEP_WITHIN_MONTHLY='1y';
+#export KEEP_WITHIN_YEARLY='5y';
+
 # The URL to ping for backup success or failure at Healthchecks.io (optional).
 export HEALTHCHECKS_URL='';
 
