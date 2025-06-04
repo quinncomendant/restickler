@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.3.5';
+restickler_version='1.3.6';
 script_start_time=$(date +%s);
 
 c_violet="\033[35m";
@@ -559,14 +559,17 @@ function _restic_backup() {
 
 function _restic_test_restore() {
     if [[ -z $canary_file || ! -s "$canary_file" ]]; then
-        _warning "Unable to test restore on $1 (canary file not found)";
+        _warning "Unable to test restore on $1 (canary file “${canary_file}” not found)";
         return 1;
     fi
     _info "Starting test restore";
-    local latest_snapshot='';
-    [[ -n $dryrun ]] || latest_snapshot=$(restic --no-lock snapshots --json --path "$1" latest | jq -re '.[0].short_id' || _error "Failed to find a snapshot with the canary file");
+    local latest_snapshot latest_snapshot_id='';
+    if [[ -z $dryrun ]]; then
+        latest_snapshot=$(restic --no-lock snapshots --json --path "$1" latest 2>&1);
+        latest_snapshot_id=$(jq -re '.[0].short_id' <<<"$latest_snapshot" || _error "Failed to restore canary “${canary_file}”. The latest snapshot ID for “$1” not found: ${latest_snapshot}");
+    fi
     # shellcheck disable=SC2086
-    $dryrunexec $caffeinate restic $quiet $verbose restore "$latest_snapshot" \
+    $dryrunexec $caffeinate restic $quiet $verbose restore "$latest_snapshot_id" \
         --target "${tmp_dir}/restickler/restore" \
         --include "$canary_file" \
         2>&1 | _log | { grep -v '^restoring' || true; };
@@ -574,7 +577,7 @@ function _restic_test_restore() {
     local restic_exit_status=${PIPESTATUS[0]};
     ((restic_exit_status == 0)) || _error "Failed to restore (exit status ${restic_exit_status})";
 
-    [[ -n $dryrun ]] || diff "$canary_file" "${tmp_dir}/restickler/restore/${canary_file}" >/dev/null || _error "Restored canary ${canary_file} doesn’t match backed-up version"
+    [[ -n $dryrun ]] || diff "$canary_file" "${tmp_dir}/restickler/restore/${canary_file}" >/dev/null || _error "Canary “${canary_file}” doesn’t match restored version.\nCanary file:      $(ls -l "$canary_file" 2>/dev/null || true)\nRestored version: $(ls -l "${tmp_dir}/restickler/restore/${canary_file}" 2>/dev/null || true)";
 
     return 0;
 }
