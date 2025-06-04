@@ -577,7 +577,8 @@ function _restic_test_restore() {
     local restic_exit_status=${PIPESTATUS[0]};
     ((restic_exit_status == 0)) || _error "Failed to restore (exit status ${restic_exit_status})";
 
-    [[ -n $dryrun ]] || diff "$canary_file" "${tmp_dir}/restickler/restore/${canary_file}" >/dev/null || _error "Canary “${canary_file}” doesn’t match restored version.\nCanary file:      $(ls -l "$canary_file" 2>/dev/null || true)\nRestored version: $(ls -l "${tmp_dir}/restickler/restore/${canary_file}" 2>/dev/null || true)";
+    [[ -n $dryrun ]] || [[ -f "${tmp_dir}/restickler/restore/${canary_file}" ]] || _error "Restored canary “${tmp_dir}/restickler/restore/${canary_file}” doesn’t exist";
+    [[ -n $dryrun ]] || diff "$canary_file" "${tmp_dir}/restickler/restore/${canary_file}" >/dev/null || _error "Canary “${canary_file}” doesn’t match restored version.\nCanary:   $(ls -l "$canary_file" 2>/dev/null || true)\nRestored: $(ls -l "${tmp_dir}/restickler/restore/${canary_file}" 2>/dev/null || true)";
 
     return 0;
 }
