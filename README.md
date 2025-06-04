@@ -78,7 +78,7 @@ OPTIONS
     -d MBPS|%           Limit download speed in Mb/s or as a percentage of available bandwidth.
     -e FILE             File containing back up exclusion rules, used as --exclude-file=FILE.
     -f HOURS            Min interval between forget operations (currently every 120 hours).
-    -H                  Abort if connected to an iOS hotspot.
+    -H                  Abort if connected to an iOS Personal Hotspot.
     -h, --help          Display this help message.
     -I                  Abort if internet is unreliable.
     --allow-auto-unlock Automatically unlock stale repository locks (older than 24h, same host+user, restic not running).
@@ -94,7 +94,7 @@ OPTIONS
     -v                  Display verbose output (-vv to list uploaded files; -vvv to show debugging output).
     -V, --version       Print version information.
 
-Restickler, by default, runs these commands in sequence to maintain the full lifecycle of a healthy repository:
+Restickler, by default, runs these commands in sequence to maintain the full life cycle of a healthy repository:
 
     1. `restic backup` (every 0 hours or as specified by -b)
     2. `restic restore` (test restore of file from SOURCE/.restickler-canary/UTC_DATE_TIME)
@@ -119,19 +119,20 @@ ENVIRONMENT VARIABLES
 The following environment variables can be defined in `~/.config/restickler/env`, which is
 automatically sourced by restickler if it exists. Use `-C FILE` to specify a custom env file.
 
-    RESTIC_REPOSITORY               The restic repository to back up to and maintain.
     RESTIC_PASSWORD_COMMAND         The shell command that outputs the repository password.
                                     (Or use RESTIC_PASSWORD, but this is less secure.)
-    GOOGLE_APPLICATION_CREDENTIALS  Path to the GCP Service Account credentials file.
-    GOOGLE_PROJECT_ID               GCP project ID.
-    HEALTHCHECKS_URL                Healthchecks.io URL to ping on success or failure (optional).
-
-The GOOGLE_* variables can be replaced with variables used by your preferred cloud provider;
-see https://restic.readthedocs.io/en/latest/030_preparing_a_new_repo.html
+    RESTIC_REPOSITORY               The restic repository to back up to and maintain.
+    KEEP_LAST, KEEP_WITHIN_*        The number of snapshots to keep: the minimum, and within time periods.
+    RESTIC_HOST                     Override hostname for restic operations (useful in multi-host setup).
+    HEALTHCHECKS_URL                Healthchecks.io URL to ping on start, success, and failure (optional).
+    GOOGLE_*, AWS_*, etc.           Cloud provider-specific credentials.
 
 LOGS
 
 Activity is logged to `~/.local/state/restickler/log`. Use `-vv` to record new and modified files.
+Info and errors are printed to STDOUT and STDERR, respectively. Useful for debugging:
+
+    … 1>/dev/null 2>>~/.local/state/restickler/debug
 
 EXAMPLES
 
