@@ -91,7 +91,7 @@ OPTIONS
     --self-update       Download the replace restickler with the latest release from GitHub.
     -t TASK,TASK,…     A list of tasks to complete on SOURCE (default: backup,restore,forget,prune,check)
     -u MBPS|%           Limit upload speed in Mb/s or as a percentage of available bandwidth.
-    -v                  Display verbose output (-vv to list uploaded files; -vvv to show debugging output).
+    -v                  Verbose output (-v to include restic output; -vv to include uploaded files; -vvv to include debugging).
     -V, --version       Print version information.
 
 Restickler, by default, runs these commands in sequence to maintain the full life cycle of a healthy repository:
