@@ -35,8 +35,11 @@ $HOME/.histfile*
 $HOME/.local/pipx
 $HOME/.local/share
 $HOME/.local/state
+$HOME/.lmstudio
 $HOME/.node-gyp
 $HOME/.npm
+$HOME/.ollama
+$HOME/.swama
 $HOME/.tor
 $HOME/.Trash
 $HOME/.zhistory*

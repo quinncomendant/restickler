@@ -57,7 +57,9 @@ allow_auto_unlock='';
 # Functions
 #
 
-function _usage() {
+function _usage {
+    local exit_status=${1:-0};
+
     echo -n "restickler ${restickler_version}
 
 A wrapper for restic (https://restic.net/) that supervises back up, forget, prune, check,
@@ -159,10 +161,10 @@ it runs every 5 minutes, back up will happen at most only once per hour (\`-b 1\
 
     */5 * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 \$HOME >/dev/null
 " | sed "s!${HOME}!~!g" 1>&2
-    exit 1;
+    exit "$exit_status";
 }
 
-function _install_config() {
+function _install_config {
     _prompt "Install example config files (\`$config_file\`, \`${config_dir}/exclude/default.txt\`)?" || exit 0;
     if [[ -e "$config_file" ]]; then
         _notice "$config_file file already exists; skipping";
@@ -182,7 +184,7 @@ function _install_config() {
     exit 0;
 }
 
-function _self_update() {
+function _self_update {
     self=$(readlink -f "$0");
     tmp_dl="${tmp_dir}/restickler-${script_start_time}-$(head -c 100 /dev/urandom | LC_ALL=C tr -dc '0-9A-Za-z')";
     cp -p "$self" "$tmp_dl"; # Copy existing script just to retain permissions.
@@ -194,12 +196,13 @@ function _self_update() {
         _notice "restickler ${restickler_version} is currently the newest version available.";
     elif _prompt "Update restickler from ${restickler_version} to ${tmp_version}?"; then
         $dryrunexec mv "$tmp_dl" "$self" || _error "Failed to replace $self with $tmp_dl";
+        echo "Updated to $("$self" --version)";
     fi
     rm -f "$tmp_dl" || true;
     exit 0;
 }
 
-function _log() {
+function _log {
     local print=${1:-true};
     local require_verbosity=${2:-false};
     if [[ $require_verbosity == true && ! $verbose =~ '-v' ]]; then
@@ -214,14 +217,14 @@ function _log() {
     done
 }
 
-function _debug() {
+function _debug {
     local IFS='' dt;
     dt=$(date '+%F %T');
     # shellcheck disable=SC2015
     [[ $verbose =~ '-v -v -v' ]] && echo -e "[${dt}] [debug] $*" | _log || true;
 }
 
-function _info() {
+function _info {
     local IFS='' dt;
     dt=$(date '+%F %T');
     # shellcheck disable=SC2015
@@ -229,7 +232,7 @@ function _info() {
     echo -e "${c_cyan}[${dt}] ${c_bold}$*${c_off}";
 }
 
-function _notice() {
+function _notice {
     local IFS='' dt;
     dt=$(date '+%F %T');
     # shellcheck disable=SC2015
@@ -237,7 +240,7 @@ function _notice() {
     echo -e "${c_violet}[${dt}] ${c_bold}$*${c_off}";
 }
 
-function _warning() {
+function _warning {
     local IFS='' dt;
     dt=$(date '+%F %T');
     echo -e "[${dt}] [warning] $*" | _log 1>&2
@@ -245,7 +248,7 @@ function _warning() {
 
 # USR1 signal is sent by _error to terminate the main script.
 trap 'exit 1' USR1;
-function _error() {
+function _error {
     local IFS='' dt;
     dt=$(date '+%F %T');
     echo -e "[${dt}] [error] $* ($(_elapsed) elapsed)" | _log 1>&2
@@ -257,7 +260,7 @@ function _error() {
     kill -USR1 $$;
 }
 
-function _prompt() {
+function _prompt {
     local yn;
     read -rp "$* [y/N]: " yn;
     case $yn in
@@ -266,7 +269,7 @@ function _prompt() {
     esac
 }
 
-function _todo() {
+function _todo {
     local needle=$1;
     for t in "${tasks[@]}"; do
         [[ $t == "$needle" ]] && return 0;
@@ -274,7 +277,7 @@ function _todo() {
     return 1;
 };
 
-function _elapsed() {
+function _elapsed {
     [[ -n ${SECONDS:-} ]] || SECONDS=$(($(date +%s) - script_start_time));
     local d=$((SECONDS/86400));
     local h=$((SECONDS%86400/3600));
@@ -293,7 +296,7 @@ function _online {
     return "$i";
 }
 
-function _speedtest() {
+function _speedtest {
     local megabytes=2 concurrency=8 dl_bytes ul_bytes config dl_url ul_url dl_raw dl_bps ul_raw ul_bps;
 
     # This function relies on curl's parallel transfer functionality.
@@ -336,7 +339,7 @@ function _speedtest() {
     echo "{\"dl_responsiveness\": 1000, \"dl_throughput\": ${dl_bps:-0}, \"ul_responsiveness\": 1000, \"ul_throughput\": ${ul_bps:-0}}";
 }
 
-function _network_quality() {
+function _network_quality {
     # Return cached internet speed test results
     # The JSON is formatted to use output from macOS's `networkQuality` command (only available on macOS 12+), but that prerequisite has been removed; now speedtest is using only curl.
     local jqfilter=${1:-.};
@@ -365,7 +368,7 @@ function _network_quality() {
     fi
 }
 
-function _convert_limit() {
+function _convert_limit {
     local limit=$1 metric=$2 arg=$3;
     # Convert UL and DL limits specified as a percentage into Mbps limits.
     if [[ $limit == *% ]]; then
@@ -377,7 +380,7 @@ function _convert_limit() {
     fi
 }
 
-function _reliable_internet() {
+function _reliable_internet {
     local ul_responsiveness dl_throughput ul_throughput;
     ul_responsiveness=$(_network_quality .ul_responsiveness || echo 0);
     dl_throughput=$(_network_quality .dl_throughput || echo 0);
@@ -386,7 +389,7 @@ function _reliable_internet() {
     (( ul_responsiveness > 50 && dl_throughput > 524288 && ul_throughput > 524288 ));
 }
 
-function _computer_has_been_idle() {
+function _computer_has_been_idle {
     # Return true if the most recent successful back up began after the computer became idle.
     local last_backup_time_file=$1 idle_seconds idle_begin_time last_backup_time;
 
@@ -400,7 +403,7 @@ function _computer_has_been_idle() {
 }
 
 # Return true if on macOS battery power.
-function _on_battery_power() {
+function _on_battery_power {
     local output;
     type -P pmset &>/dev/null || return 1;
     output=$(pmset -g batt);
@@ -408,7 +411,7 @@ function _on_battery_power() {
 }
 
 # Return true if connected to an iOS Personal Hotspot (which seems to reliably assign an IP address in the 172.20.10.xxx range).
-function _connected_to_hotspot() {
+function _connected_to_hotspot {
     local output;
     type -P networksetup &>/dev/null || return 1;
     output=$(networksetup -listallnetworkservices | grep -v '\*' | tr '\n' '\0' | xargs -0 -n 1 networksetup -getinfo 2>&1);
@@ -416,17 +419,17 @@ function _connected_to_hotspot() {
 }
 
 # Detect if any restic processes are running on this computer. If no processes are running, returns an empty string. If any processes end with the word `…/restic `, return the command names enclosed in quotes and comma separated.
-function _running_restic_processes() {
+function _running_restic_processes {
     # shellcheck disable=SC2009
     ps -Ao command 2>/dev/null | grep '^[/A-Za-z0-9]*restic ' | awk 'NF{printf "%s“%s”", sep, $0; sep=", "}' 2>/dev/null || true;
 }
 
-function _running_restickler_processes() {
+function _running_restickler_processes {
     # shellcheck disable=SC2009
     ps -Ao command 2>/dev/null | grep '^bash [/A-Za-z0-9]*restickler ' | awk 'NF{printf "%s“%s”", sep, $0; sep=", "}' 2>/dev/null || true;
 }
 
-function _repository_is_locked() {
+function _repository_is_locked {
     local command=$1 lock_ids restic_process;
 
     lock_ids=$(restic -q --no-lock list locks 2>/dev/null || true);
@@ -490,7 +493,7 @@ function _repository_is_locked() {
     return 1; # Unlocked.
 }
 
-function _restic_unlock() {
+function _restic_unlock {
     if ! _online; then
         _notice "Skipping unlock because network is offline";
         return 1;
@@ -504,7 +507,7 @@ function _restic_unlock() {
     ((restic_exit_status == 0)) || _error "Failed to unlock (exit status ${restic_exit_status})";
 }
 
-function _restic_backup() {
+function _restic_backup {
     local last_backup_time_file;
     last_backup_time_file="${state_dir}/last-backup-time-$(LC_ALL=C tr -c '0-9A-Za-z\n' - <<<"$*")";
 
@@ -578,7 +581,7 @@ function _restic_backup() {
     return 0;
 }
 
-function _restic_test_restore() {
+function _restic_test_restore {
     if [[ -z $canary_file || ! -s "$canary_file" ]]; then
         _warning "Unable to test restore on $1 (canary file “${canary_file}” not found)";
         return 1;
@@ -600,7 +603,7 @@ function _restic_test_restore() {
     return 0;
 }
 
-function _restic_forget() {
+function _restic_forget {
     if [[ -s "${state_dir}/last-forget-time" && $(<"${state_dir}/last-forget-time") -gt $((script_start_time - (60 * 60 * forget_interval_hours))) ]]; then
         _info "Skipping forget (last ran $(bc <<<"scale=1; (${script_start_time} - $(<"${state_dir}/last-forget-time")) / 60 / 60") hours ago)";
         return 1;
@@ -670,7 +673,7 @@ function _restic_forget() {
     return 0;
 }
 
-function _restic_prune() {
+function _restic_prune {
     if [[ -s "${state_dir}/last-prune-time" && $(<"${state_dir}/last-prune-time") -gt $((script_start_time - (60 * 60 * prune_interval_hours))) ]]; then
         _info "Skipping prune (last ran $(bc <<<"scale=1; (${script_start_time} - $(<"${state_dir}/last-prune-time")) / 60 / 60") hours ago)";
         return 1;
@@ -722,7 +725,7 @@ function _restic_prune() {
     return 0;
 }
 
-function _restic_check() {
+function _restic_check {
     if [[ -s "${state_dir}/last-check-time" && $(<"${state_dir}/last-check-time") -gt $((script_start_time - (60 * 60 * check_interval_hours))) ]]; then
         _info "Skipping check (last ran $(bc <<<"scale=1; (${script_start_time} - $(<"${state_dir}/last-check-time")) / 60 / 60") hours ago)";
         return 1;
@@ -782,7 +785,7 @@ function _restic_check() {
 #
 
 # Display help if run without arguments.
-[[ $# == 0 ]] && _usage;
+[[ $# == 0 ]] && _usage 1;
 
 # Test dependencies.
 for requiredcmd in restic curl jq bc tr awk sed readlink curl; do
@@ -811,7 +814,7 @@ while getopts "ABb:C:c:d:e:f:HhInp:qt:u:Vv-:" opt; do
         (e) exclude_file=$OPTARG;;
         (f) forget_interval_hours=${OPTARG%.*};;
         (H) do_check_hotspot=1;;
-        (h) _usage;;
+        (h) _usage 0;;
         (I) do_check_internet=1;;
         (n) dryrun='--dry-run'; dryrunexec='echo DRY-RUN:';;
         (p) prune_interval_hours=${OPTARG%.*};;
@@ -822,7 +825,7 @@ while getopts "ABb:C:c:d:e:f:HhInp:qt:u:Vv-:" opt; do
         (v) verbose="-v ${verbose}";;
         (-) case $OPTARG in
             (allow-auto-unlock) allow_auto_unlock=1;;
-            (help) _usage;;
+            (help) _usage 0;;
             (install-config) _install_config;;
             (self-update) _self_update;;
             (version) echo "restickler ${restickler_version} ($(type -P restic &>/dev/null && restic version))"; exit 0;;
@@ -875,7 +878,7 @@ mkdir "${tmp_dir}/restickler/lock${dryrun}" 2>/dev/null || {
 # Internet speed test results are regenerated each time restickler runs.
 rm -f "${state_dir}/network_quality.json";
 
-function _trap() {
+function _trap {
     local status=$? sig=$1 line=$2;
     case $sig in
         (HUP) _warning "Received SIGHUP; continuing anyways…";;
