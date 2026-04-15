@@ -1,5 +1,7 @@
 restickler-hero.jpg
 codebook.toml
 test/config/
+test/source/
 test/state/
+test/tmp/
 !AGENTS.md

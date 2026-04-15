@@ -23,7 +23,7 @@ c_off="\033[0m";
 config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/restickler";
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/restickler";
 config_file="${config_dir}/env";
-tmp_dir=/tmp;
+tmp_dir="${TMPDIR:-/tmp}";
 log_file="${state_dir}/log";
 log_tmp_file=$(mktemp);
 canary_file='';
@@ -871,7 +871,7 @@ done
 
 # Enforce single-instance execution (via mkdir, which creates atomic lock and check at once).
 # A design goal of restickler is to complete its tasks as quickly as possible. As such, we want to avoid resource contention.
-# Use of --dry-run has a different lock file (/tmp/restickler/lock--dry-run) to allow testing while backups may be in process.
+# Use of --dry-run has a different lock file to allow testing while backups may be in process.
 mkdir "${tmp_dir}/restickler/lock${dryrun}" 2>/dev/null || {
     _debug "Another restickler process is running (lock exists; restickler process: $(_running_restickler_processes)).";
     exit 1;

@@ -6,8 +6,14 @@ set -o nounset;
 set -o noclobber;
 
 [[ $(head -1 README.md) == "# restickler" ]] || { echo "Run tests from the project root" && exit 1; }
-export XDG_CONFIG_HOME="$PWD/test/config"
-export XDG_STATE_HOME="$PWD/test/state"
+test_root="$PWD/test"
+test_source="$test_root/source"
+test_env_file="$test_root/config/restickler/env"
+export XDG_CONFIG_HOME="$test_root/config"
+export XDG_STATE_HOME="$test_root/state"
+export TMPDIR="$test_root/tmp"
+export RESTIC_CACHE_DIR="$TMPDIR/restic-cache"
+mkdir -p "$TMPDIR" "$RESTIC_CACHE_DIR"
 
 function usage {
   cat <<EOF
@@ -25,17 +31,26 @@ EOF
 }
 
 cmd=${1:-help}
-logfile="$PWD/test/state/restickler/log"
+
+function prepare_test_env {
+  mkdir -p "$(dirname "$test_env_file")" "$XDG_STATE_HOME/restickler" "$test_source"
+  mkdir -p "$XDG_CONFIG_HOME/restickler/exclude"
+  [[ -f "$test_env_file" ]] || { echo "Missing test env: run './test/test.sh install-config' first" && exit 1; }
+  printf 'restickler test fixture\n' >| "$test_source/example.txt"
+  [[ -f "$XDG_CONFIG_HOME/restickler/exclude/default.txt" ]] || printf '# Test exclude rules\n' >| "$XDG_CONFIG_HOME/restickler/exclude/default.txt"
+}
+
 case $cmd in
   smoke-test) if "$PWD/bin/restickler" --help &>/dev/null; then echo "Smoke test passed" && exit 0; else echo "Smoke test failed" && exit 1; fi ;;
   install-config) "$PWD/bin/restickler" --install-config ;;
-  dry-run) "$PWD/bin/restickler" -t backup,restore -nvABHI -b 0 --allow-auto-unlock "$PWD/test" ;;
-  simple) "$PWD/bin/restickler" -t backup,restore -vABHI -b 0 --allow-auto-unlock "$PWD/test" ;;
-  full) "$PWD/bin/restickler" -vvvABHI -b 0 -f 0 -p 0 -c 0 -d 99% -u 99% -t backup,restore,forget --allow-auto-unlock "$PWD/test" ;;
+  dry-run) prepare_test_env; "$PWD/bin/restickler" -t backup,restore -nvABHI -b 0 --allow-auto-unlock "$test_source" ;;
+  simple) prepare_test_env; "$PWD/bin/restickler" -t backup,restore -vABHI -b 0 --allow-auto-unlock "$test_source" ;;
+  full) prepare_test_env; "$PWD/bin/restickler" -vvvABHI -b 0 -f 0 -p 0 -c 0 -d 99% -u 99% -t backup,restore,forget --allow-auto-unlock "$test_source" ;;
   restic-find)
+    prepare_test_env
     # shellcheck source=/dev/null
-    . "$PWD/test/config/restickler/env"
-    restic find "${2:-$logfile}"
+    . "$test_env_file"
+    restic find "${2:-$test_source/example.txt}"
     deactivate_restic_env
     ;;
   help) usage ;;
