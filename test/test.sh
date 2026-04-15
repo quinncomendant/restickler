@@ -7,8 +7,7 @@ set -o noclobber;
 
 [[ $(head -1 README.md) == "# restickler" ]] || { echo "Run tests from the project root" && exit 1; }
 test_root="$PWD/test"
-test_source="$test_root/source"
-test_env_file="$test_root/config/restickler/env"
+exclude_file="$test_root/config/restickler/exclude/test.txt"
 export XDG_CONFIG_HOME="$test_root/config"
 export XDG_STATE_HOME="$test_root/state"
 export TMPDIR="$test_root/tmp"
@@ -30,27 +29,23 @@ EOF
   exit 0
 }
 
-cmd=${1:-help}
-
 function prepare_test_env {
-  mkdir -p "$(dirname "$test_env_file")" "$XDG_STATE_HOME/restickler" "$test_source"
-  mkdir -p "$XDG_CONFIG_HOME/restickler/exclude"
-  [[ -f "$test_env_file" ]] || { echo "Missing test env: run './test/test.sh install-config' first" && exit 1; }
-  printf 'restickler test fixture\n' >| "$test_source/example.txt"
-  [[ -f "$XDG_CONFIG_HOME/restickler/exclude/default.txt" ]] || printf '# Test exclude rules\n' >| "$XDG_CONFIG_HOME/restickler/exclude/default.txt"
+  [[ -f "$test_root/config/restickler/env" ]] || { echo "Missing test env: run './test/test.sh install-config' first" && exit 1; }
 }
 
+# The ./test/ dir is used for test backups, because it contains just a small number of changing files (e.g., the log).
+cmd=${1:-help}
 case $cmd in
   smoke-test) if "$PWD/bin/restickler" --help &>/dev/null; then echo "Smoke test passed" && exit 0; else echo "Smoke test failed" && exit 1; fi ;;
   install-config) "$PWD/bin/restickler" --install-config ;;
-  dry-run) prepare_test_env; "$PWD/bin/restickler" -t backup,restore -nvABHI -b 0 --allow-auto-unlock "$test_source" ;;
-  simple) prepare_test_env; "$PWD/bin/restickler" -t backup,restore -vABHI -b 0 --allow-auto-unlock "$test_source" ;;
-  full) prepare_test_env; "$PWD/bin/restickler" -vvvABHI -b 0 -f 0 -p 0 -c 0 -d 99% -u 99% -t backup,restore,forget --allow-auto-unlock "$test_source" ;;
+  dry-run) prepare_test_env; "$PWD/bin/restickler" -t backup,restore -nvABHI -b 0 --allow-auto-unlock -e "$exclude_file" "$test_root" ;;
+  simple) prepare_test_env; "$PWD/bin/restickler" -t backup,restore -vABHI -b 0 --allow-auto-unlock -e "$exclude_file" "$test_root" ;;
+  full) prepare_test_env; "$PWD/bin/restickler" -vvvABHI -b 0 -f 0 -p 0 -c 0 -d 99% -u 99% -t backup,restore,forget --allow-auto-unlock -e "$exclude_file" "$test_root" ;;
   restic-find)
     prepare_test_env
     # shellcheck source=/dev/null
-    . "$test_env_file"
-    restic find "${2:-$test_source/example.txt}"
+    . "$test_root/config/restickler/env"
+    restic find "${2:-$XDG_STATE_HOME/restickler/log}"
     deactivate_restic_env
     ;;
   help) usage ;;
