@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.3.9';
+restickler_version='1.4.0';
 script_start_time=$(date +%s);
 
 c_cyan="\033[36m";
@@ -538,7 +538,7 @@ function _restic_backup {
 
     if [[ -n $do_check_internet ]] && ! _reliable_internet; then
         _notice "Aborting back up because of unreliable internet";
-        exit 1;
+        exit 0;
     fi
 
     _repository_is_locked backup && return 1;
@@ -621,7 +621,7 @@ function _restic_forget {
 
     if [[ -n $do_check_internet ]] && ! _reliable_internet; then
         _notice "Aborting forget because of unreliable internet";
-        exit 1;
+        exit 0;
     fi
 
     _repository_is_locked forget && return 1;
@@ -696,7 +696,7 @@ function _restic_prune {
 
     if [[ -n $do_check_internet ]] && ! _reliable_internet; then
         _notice "Aborting prune because of unreliable internet";
-        exit 1;
+        exit 0;
     fi
 
     _repository_is_locked prune && return 1;
@@ -748,7 +748,7 @@ function _restic_check {
 
     if [[ -n $do_check_internet ]] && ! _reliable_internet; then
         _notice "Aborting check because of unreliable internet";
-        exit 1;
+        exit 0;
     fi
 
     _repository_is_locked check && return 1;
@@ -860,6 +860,8 @@ for t in "${tasks[@]}"; do
     done;
     [[ $invalid_task -eq 0 ]] || _error "Invalid task: $t";
 done;
+# Add an implicit `backup` task, if not already paired with `restore`.
+_todo restore && ! _todo backup && tasks=(backup "${tasks[@]}");
 
 # Additional arguments are backup sources. Verify them.
 for src in "$@"; do
@@ -922,7 +924,7 @@ fi
 # Make sure the remote repository exists.
 if ! restic --no-lock snapshots >/dev/null; then
     _warning "Failed to connect to repository ${RESTIC_REPOSITORY}";
-    exit 0;
+    exit 1;
 fi
 
 #

@@ -1,6 +1,6 @@
 # restickler
 
-A wrapper for [restic](https://restic.net/) that supervises back up, forget, prune, check, and a test restore. Designed for macOS, but works on Linux too.
+A wrapper for [restic](https://restic.net/) that supervises the full automated backup lifecycle (backup → test-restore → forget → prune → check). Designed for macOS, but works on Linux too.
 
 Restickler is stable as of v1.2.0. It runs impeccably on my macOS dev machine and Linux servers, but since your environment might be different, please use at your own risk. If you notice a glitch, please create an [issue](https://github.com/quinncomendant/restickler/issues).
 

@@ -18,6 +18,7 @@ export RESTIC_REPOSITORY='';
 # Restic backup configuration parameters.
 # https://restic.readthedocs.io/en/stable/047_tuning_backup_parameters.html
 export RESTIC_COMPRESSION='auto';
+export GOMAXPROCS=1;
 
 # Retention policy. Uncomment to unset or override default values.
 # https://restic.readthedocs.io/en/stable/060_forget.html
