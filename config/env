@@ -5,7 +5,7 @@
 # 1. Add the password to the login keychain: `security add-generic-password -a restic -s restic-repo-pw -w`
 # 2. Copy it from the login keychain to the System keychain (right-click copy in login → right-click paste in System).
 export RESTIC_PASSWORD_COMMAND='security find-generic-password -a restic -s restic-repo-pw -w';
-# On Linux you save your password to `~/.config/restickler/restic-repo-pw` (`chmod 600 …`) and use:
+# On Linux you can save your password to `~/.config/restickler/restic-repo-pw` (`chmod 600 …`) and use:
 #export RESTIC_PASSWORD_COMMAND="cat $HOME/.config/restickler/restic-repo-pw";
 # You may also use the RESTIC_PASSWORD variable, but this is less secure, because exported variables
 # containing credentials may be revealed accidentally.
@@ -47,6 +47,12 @@ function deactivate_restic_env() {
     RESTIC_REPOSITORY \
     RESTIC_COMPRESSION \
     GOMAXPROCS \
+    KEEP_LAST \
+    KEEP_WITHIN_HOURLY \
+    KEEP_WITHIN_DAILY \
+    KEEP_WITHIN_WEEKLY \
+    KEEP_WITHIN_MONTHLY \
+    KEEP_WITHIN_YEARLY \
     HEALTHCHECKS_URL \
     GOOGLE_PROJECT_ID \
     GOOGLE_APPLICATION_CREDENTIALS \

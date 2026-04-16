@@ -15,7 +15,9 @@ Restickler is stable as of v1.2.0. It runs impeccably on my macOS dev machine an
 
 ## Install
 
-1. Install prerequisites: [restic](https://restic.readthedocs.io/en/latest/020_installation.html) and [jq](https://stedolan.github.io/jq/download/). Use [Homebrew](https://brew.sh/) to install on macOS: `brew install restic jq`
+1. Install prerequisites: [restic](https://restic.readthedocs.io/en/latest/020_installation.html), [jq](https://stedolan.github.io/jq/download/), `bc`, and `curl`.
+    - macOS with [Homebrew](https://brew.sh/): `brew install restic jq`
+    - Debian/Ubuntu: `sudo apt install restic jq bc curl`
 2. Install the `restickler` script in `~/bin/` (or wherever you run scripts from):
 
     ```bash

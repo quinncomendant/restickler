@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.4.0';
+restickler_version='1.4.1';
 script_start_time=$(date +%s);
 
 c_cyan="\033[36m";
@@ -160,7 +160,7 @@ and download limited to 75% of available bandwidth (cron needs % to be escaped).
 it runs every 5 minutes, back up will happen at most only once per hour (\`-b 1\`):
 
     */5 * * * * restickler -vvABHI -d 75\% -u 75\% -b 1 \$HOME >/dev/null
-" | sed "s!${HOME}!~!g" 1>&2
+" | sed "s!${HOME}!~!g";
     exit "$exit_status";
 }
 
