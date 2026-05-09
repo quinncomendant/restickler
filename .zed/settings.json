@@ -1,0 +1,42 @@
+// Folder-specific settings
+//
+// For a full list of overridable settings, and general information on folder-specific settings,
+// see the documentation: https://zed.dev/docs/configuring-zed#settings-files
+{
+  "file_scan_exclusions": [
+  ],
+  "file_types": {
+    "PHP": ["html", "ihtml", "php"]
+  },
+  "languages": {
+    "Shell Script": {
+      "tab_size": 4,
+      "format_on_save": "off"
+    },
+  },
+  "lsp": {
+    // "phpactor": {
+    //   "initialization_options": {
+    //     "language_server.diagnostic_ignore_codes": ["worse.undefined_variable", "worse.unresolved_name", "worse.docblock_missing_param", "worse.missing_return_type"]
+    //   }
+    // },
+    // "biome": {
+    //   "settings": {
+    //     "inline_config": {
+    //       "linter": {
+    //         "rules": {
+    //           "complexity": {
+    //             "useArrowFunction": "off",
+    //           },
+    //           "correctness": {
+    //             "noInnerDeclarations": "off",
+    //           },
+    //           "style": {},
+    //           "suspicious": {},
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
+  },
+}

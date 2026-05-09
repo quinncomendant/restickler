@@ -4,3 +4,4 @@ test/config/
 test/state/
 test/tmp/
 !AGENTS.md
+!.zed
