@@ -10,7 +10,7 @@ set -o errtrace;
 set -o nounset;
 set -o noclobber;
 
-restickler_version='1.4.1';
+restickler_version='1.4.2';
 script_start_time=$(date +%s);
 
 c_cyan="\033[36m";
@@ -711,8 +711,9 @@ function _restic_prune {
     local limit_download limit_upload;
     limit_download=$(_convert_limit "$dl_limit" ".dl_throughput" "--limit-download");
     limit_upload=$(_convert_limit "$ul_limit" ".ul_throughput" "--limit-upload");
+    # --cleanup-cache removes old cache directories before pruning (default 30 days, can set with --max-age)
     # shellcheck disable=SC2086
-    $caffeinate restic $quiet $verbose $limit_download $limit_upload prune \
+    $caffeinate restic $quiet $verbose $limit_download $limit_upload --cleanup-cache prune \
         $dryrun \
         2>&1 | _log true true;
 
